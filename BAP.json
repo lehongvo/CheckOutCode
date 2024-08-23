@@ -1,0 +1,248 @@
+Sub-Tab 1: Nạp tiền (dùng Stripe để nạp và lấy token)
+1. API để nạp tiền qua Stripe
+    * Endpoint: /api/wallet/deposit
+    * Method: POST
+    * Description: Xử lý thanh toán qua Stripe. Sau khi thanh toán thành công, hệ thống sẽ ghi nhận số tiền đã nạp vào ví của người dùng và cấp token tương ứng.
+*     ETA: 5-7 giờ
+1. API để kiểm tra trạng thái thanh toán qua Stripe
+    * Endpoint: /api/wallet/deposit/status
+    * Method: GET
+    * Description: Truy vấn trạng thái giao dịch nạp tiền qua Stripe để đảm bảo rằng giao dịch đã thành công và cập nhật số dư cho người dùng.
+* ETA: 3-4 giờ
+Sub-Tab 2: Option
+Vì chưa rõ chức năng cụ thể của sub-tab này, mình có thể đưa ra một số giả thuyết về các API có thể cần:
+1. API để lấy các tùy chọn ví hoặc loại token
+    * Endpoint: /api/wallet/options
+    * Method: GET
+    * Description: Trả về danh sách các tùy chọn ví (loại ví, loại token) mà người dùng có thể chọn.
+2. API để cập nhật tùy chọn ví
+    * Endpoint: /api/wallet/options/update
+    * Method: POST
+    * Description: Cho phép người dùng cập nhật tùy chọn ví (ví dụ như chọn loại token để sử dụng trong các giao dịch).
+Sub-Tab 3: Chuyển token/ERC20
+1. API chuyển token ERC20
+    * Endpoint: /api/wallet/transfer
+    * Method: POST
+    * Description: Xử lý việc chuyển token ERC20 từ ví của người dùng đến một địa chỉ khác. API này cần thực hiện việc kiểm tra số dư và ký giao dịch để thực hiện việc chuyển token.
+* ETA: 1-2 giờ
+1. API kiểm tra trạng thái chuyển token
+    * Endpoint: /api/wallet/transfer/status
+    * Method: GET
+    * Description: Truy vấn trạng thái giao dịch chuyển token, đảm bảo giao dịch đã thành công và cập nhật lại số dư trong ví của người dùng.
+* ETA: 1-2 giờ
+Sub-Tab 4: Lịch sử giao dịch
+1. API lấy lịch sử giao dịch
+    * Endpoint: /api/wallet/history
+    * Method: GET
+    * Description: Trả về lịch sử các giao dịch đã thực hiện từ ví của người dùng, bao gồm cả giao dịch nạp tiền, chuyển token, và nhận token.
+* ETA: 4-5 giờ
+1. API lọc lịch sử giao dịch theo thời gian hoặc loại giao dịch
+    * Endpoint: /api/wallet/history/filter
+    * Method: GET
+    * Description: Cho phép lọc lịch sử giao dịch theo khoảng thời gian hoặc theo loại giao dịch (nạp tiền, chuyển token, nhận token).
+* ETA: 1 -2 giờ
+
+Contract trung gian
+Contract nhận quyền mint NFT từ Admin:
+* Task: Phát triển một contract trung gian có quyền mint NFT thay cho admin. Contract này sẽ nhận quyền mint từ admin để xử lý việc mint cho người dùng.
+* Cần có: Chức năng kiểm tra quyền mint từ admin và xác minh rằng chỉ contract này mới được phép mint NFT.
+Hàm mint NFT với chữ ký của người dùng:
+* Task: Viết hàm để mint NFT cho người dùng nhưng cần có chữ ký của người dùng. Điều này đảm bảo rằng người dùng đã ủy quyền mint bằng cách cung cấp chữ ký của họ.
+Hàm xử lý chuyển token từ user đến admin:
+* Task: Viết hàm trong contract trung gian để xử lý việc chuyển token từ người dùng đến admin nhằm thanh toán phí mint NFT. Hàm này sẽ yêu cầu chữ ký của người dùng để xác nhận giao dịch.
+Hàm kiểm tra số dư và yêu cầu ký:
+* Task: Contract trung gian cần có hàm để kiểm tra số dư của user, sau đó yêu cầu chữ ký từ user nếu đủ điều kiện thực hiện giao dịch.
+Quản lý phí giao dịch và chuyển tiền:
+* Task: Phát triển các hàm để xử lý phí giao dịch, bao gồm việc tính toán phí cần thiết và chuyển token từ user đến admin. Contract sẽ đảm bảo tính bảo mật và tránh gian lận.
+Chuyển dữ liệu và đồng bộ với hệ thống Backend:
+* Task: Phát triển logic để contract trung gian chuyển dữ liệu về trạng thái giao dịch và đồng bộ hóa với hệ thống Backend.
+Quản lý quyền admin cho contract trung gian:
+* Task: Đảm bảo rằng chỉ admin hoặc các contract được chỉ định mới có quyền gọi các hàm đặc biệt như mint NFT và quản lý giao dịch.
+
+
+Contract trung gian:
+1. Contract nhận quyền mint NFT từ Admin
+    * ETA: 3-4 giờ
+    * Task: Phát triển một contract trung gian có quyền mint NFT thay cho admin. Contract này sẽ nhận quyền mint từ admin để xử lý việc mint cho người dùng.
+2. Hàm mint NFT với chữ ký của người dùng
+    * ETA: 2-3 giờ
+    * Task: Viết hàm để mint NFT cho người dùng, yêu cầu có chữ ký của người dùng để đảm bảo việc ủy quyền.
+3. Hàm xử lý chuyển token từ user đến admin
+    * ETA: 2-3 giờ
+    * Task: Viết hàm trong contract trung gian để xử lý việc chuyển token từ người dùng đến admin nhằm thanh toán phí mint NFT.
+4. Hàm kiểm tra số dư và yêu cầu ký
+    * ETA: 1.5-2.5 giờ
+    * Task: Contract trung gian cần có hàm để kiểm tra số dư của user, sau đó yêu cầu chữ ký từ user nếu đủ điều kiện thực hiện giao dịch.
+5. Quản lý phí giao dịch và chuyển tiền
+    * ETA: 2-3 giờ
+    * Task: Phát triển các hàm để xử lý phí giao dịch, bao gồm việc tính toán phí cần thiết và chuyển token từ user đến admin.
+6. Chuyển dữ liệu và đồng bộ với hệ thống Backend
+    * ETA: 1.5-2 giờ
+    * Task: Phát triển logic để contract trung gian chuyển dữ liệu về trạng thái giao dịch và đồng bộ hóa với hệ thống Backend.
+7. Quản lý quyền admin cho contract trung gian
+    * ETA: 1-1.5 giờ
+    * Task: Đảm bảo rằng chỉ admin hoặc các contract được chỉ định mới có quyền gọi các hàm đặc biệt như mint NFT và quản lý giao dịch.
+Tổng cộng ETA cho Contract trung gian:
+
+* ETA tổng cộng: 13-19 giờ
+
+NFT Contract:
+1. Thêm function liệt kê toàn bộ NFT của một user
+    * ETA: 1.5-2 giờ
+    * Task: Phát triển một hàm trên smart contract để truy xuất tất cả NFT thuộc quyền sở hữu của một user cụ thể, sử dụng cấu trúc mapping trong Solidity.
+2. Thêm function mint NFT with metadata
+    * ETA: 2-3 giờ
+    * Task: Viết hàm mint một NFT mới kèm theo metadata (tên, hình ảnh, thuộc tính). Metadata có thể lưu trữ trên IPFS hoặc trực tiếp trên blockchain dưới dạng URI.
+3. Thêm function update metadata
+    * ETA: 2-2.5 giờ
+    * Task: Phát triển hàm cho phép cập nhật metadata của một NFT đã được mint. Đảm bảo xử lý bảo mật để chỉ cho phép chủ sở hữu hoặc admin cập nhật metadata.
+4. Thêm quyền mint cho một contract hoặc hệ thống admin trung gian
+    * ETA: 1.5-2 giờ
+    * Task: Cài đặt quyền kiểm soát để chỉ một số contract hoặc admin trung gian mới có thể mint NFT. Sử dụng thiết kế như Ownable hoặc AccessControl trong Solidity.
+5. Viết script deploy smart contract
+    * ETA: 1.5-2 giờ
+    * Task: Viết script để deploy smart contract lên mạng lưới blockchain. Sử dụng các công cụ như Truffle, Hardhat hoặc Remix.
+6. Viết script verify smart contract
+    * ETA: 1-1.5 giờ
+    * Task: Viết script để verify smart contract trên các nền tảng như Etherscan hoặc BscScan sau khi deploy.
+7. Viết unit test cho các function của smart contract
+    * ETA: 2.5-3.5 giờ
+    * Task: Phát triển unit test để kiểm tra các chức năng chính của smart contract, bao gồm mint, update metadata và quyền truy cập.
+8. Tích hợp IPFS để lưu trữ metadata
+    * ETA: 2-2.5 giờ
+    * Task: Sử dụng IPFS để lưu trữ metadata của NFT, và phát triển logic trên smart contract để lưu trữ các hash của IPFS liên quan đến metadata.
+9. Phân quyền quản lý và cập nhật
+    * ETA: 1.5-2 giờ
+    * Task: Thêm chức năng phân quyền cho phép các admin khác nhau có thể quản lý và cập nhật thông tin của NFT.
+10. Quản lý phí giao dịch
+* ETA: 1.5-2.5 giờ
+* Task: Thêm các chức năng để quản lý phí giao dịch khi mint hoặc chuyển NFT. Xử lý các trường hợp như yêu cầu người dùng trả phí mint hoặc admin chịu phí gas.
+Tổng cộng ETA cho NFT Contract:
+* ETA tổng cộng: 17.5-23 giờ
+
+API Cho Phần NFT:
+1. API liệt kê danh sách NFT mà user đang sở hữu
+    * ETA: 3-4 giờ
+    * Task: Phát triển API để trả về danh sách NFT mà người dùng hiện tại đang sở hữu.
+2. API lấy chi tiết metadata của một NFT
+    * ETA: 2.5-3 giờ
+    * Task: Phát triển API để trả về metadata chi tiết của một NFT cụ thể, bao gồm tên, mô tả, hình ảnh, và thuộc tính khác.
+3. API mint hoặc chuyển NFT
+    * ETA: 4-5 giờ
+    * Task: Phát triển API để tạo mới hoặc chuyển quyền sở hữu NFT từ người dùng này sang người dùng khác.
+4. API cập nhật metadata của một NFT
+    * ETA: 3-4 giờ
+    * Task: Phát triển API cho phép người dùng hoặc admin cập nhật metadata của một NFT đã mint.
+5. API tạo IPFS từ thông tin người dùng
+    * ETA: 3-4 giờ
+    * Task: Phát triển API để lưu trữ metadata hoặc thông tin của NFT trên IPFS, một hệ thống lưu trữ phi tập trung.
+6. API xóa hoặc "burn" NFT
+    * ETA: 2.5-3 giờ
+    * Task: Phát triển API để xóa hoặc "burn" một NFT khỏi hệ thống.
+7. API kiểm tra quyền sở hữu của một NFT
+    * ETA: 2.5-3 giờ
+    * Task: Phát triển API để kiểm tra quyền sở hữu của một NFT cụ thể.
+8. API lấy lịch sử giao dịch của một NFT
+    * ETA: 2.5-3 giờ
+    * Task: Phát triển API để trả về lịch sử giao dịch của một NFT, bao gồm tất cả các lần chuyển quyền sở hữu và cập nhật metadata.
+9. API kiểm tra tính xác thực của NFT
+    * ETA: 2-2.5 giờ
+    * Task: Phát triển API để kiểm tra tính xác thực và hợp lệ của NFT trong hệ thống.
+10. API cập nhật quyền sở hữu hoặc quyền admin cho một NFT
+* ETA: 3-4 giờ
+* Task: Phát triển API để cập nhật quyền sở hữu hoặc quyền admin cho một NFT, cho phép phân quyền quản lý NFT.
+Tổng cộng ETA cho API Phần NFT:
+* ETA tổng cộng: 29.5-36 giờ
+    * 
+ 
+Payment/1. Stripe 2. Coin
+1. API xử lý yêu cầu thanh toán
+    * Endpoint: /api/payment/request
+    * ETA: 4-5 giờ
+    * Description: Nhận yêu cầu thanh toán từ người dùng khi bắt đầu quá trình mint NFT và kiểm tra các điều kiện như số dư JOC hoặc Token WB.
+2. API lấy số dư JOC của người dùng
+    * Endpoint: /api/payment/balance/joc
+    * ETA: 2-3 giờ
+    * Description: Kiểm tra số dư JOC của người dùng để xem có đủ để thực hiện giao dịch mint NFT hay không.
+3. API lấy số dư Token WB của người dùng
+    * Endpoint: /api/payment/balance/wb
+    * ETA: 2-3 giờ
+    * Description: Kiểm tra số dư Token WB của người dùng để xác minh đủ điều kiện thanh toán.
+4. API hiển thị lỗi nếu số dư không đủ
+    * Endpoint: /api/payment/error
+    * ETA: 2-3 giờ
+    * Description: Xử lý và hiển thị lỗi nếu người dùng không đủ số dư để thực hiện giao dịch (liên quan đến JOC hoặc WB).
+5. API xử lý thanh toán qua Stripe
+    * Endpoint: /api/payment/stripe
+    * ETA: 4-5 giờ
+    * Description: Thực hiện thanh toán qua Stripe nếu người dùng chọn phương thức thanh toán này.
+6. API cập nhật trạng thái giao dịch sau khi thanh toán thành công
+    * Endpoint: /api/payment/status/update
+    * ETA: 3-4 giờ
+    * Description: Cập nhật trạng thái giao dịch sau khi thanh toán thành công hoặc thất bại, bao gồm cả việc ghi nhận trên Blockchain.
+7. API đồng bộ dữ liệu với Blockchain
+    * Endpoint: /api/payment/sync
+    * ETA: 3-4 giờ
+    * Description: Đồng bộ trạng thái giao dịch từ Blockchain về hệ thống Backend, cập nhật trạng thái trên hệ thống.
+8. API trả về trạng thái giao dịch
+    * Endpoint: /api/payment/status
+    * ETA: 2-3 giờ
+    * Description: Trả về trạng thái của một giao dịch cụ thể (thành công hoặc thất bại).
+9. API gửi thông báo trạng thái giao dịch cho người dùng
+    * Endpoint: /api/payment/notify
+    * ETA: 2-3 giờ
+    * Description: Gửi thông báo về trạng thái giao dịch cho người dùng sau khi giao dịch đã hoàn tất.
+Tổng cộng ETA cho Payment API:
+* ETA tổng cộng: 24-33 giờ
+
+ 
+Metamask/Login API
+1. API xử lý yêu cầu đăng nhập hoặc tạo tài khoản mới
+    * Endpoint: /api/metamask/login
+    * ETA: 4-6 giờ
+    * Mô tả: Phát triển endpoint để nhận và xử lý yêu cầu đăng nhập hoặc tạo tài khoản từ Frontend thông qua MetaMask.
+2. API xử lý yêu cầu chữ ký từ MetaMask
+    * Endpoint: /api/metamask/signature
+    * ETA: 3-5 giờ
+    * Mô tả: Phát triển endpoint để hiển thị và xử lý yêu cầu chữ ký từ MetaMask nhằm xác nhận giao dịch hoặc xác thực người dùng.
+3. API lưu trữ dữ liệu người dùng
+    * Endpoint: /api/metamask/store
+    * ETA: 2-4 giờ
+    * Mô tả: Phát triển endpoint để lưu trữ thông tin ví và chữ ký của người dùng trong cơ sở dữ liệu sau khi hoàn thành quá trình xác thực.
+4. API xác thực và kiểm tra thông tin
+    * Endpoint: /api/metamask/verify
+    * ETA: 4-6 giờ
+    * Mô tả: Phát triển endpoint để xác minh chữ ký và kiểm tra thông tin tài khoản của người dùng, đảm bảo tính hợp lệ.
+5. API tạo hoặc xác thực tài khoản
+    * Endpoint: /api/user/authenticate
+    * ETA: 5-7 giờ
+    * Mô tả: Phát triển endpoint để tạo tài khoản mới hoặc xác thực tài khoản hiện có dựa trên thông tin từ MetaMask, kết nối với Backend để xử lý tài khoản.
+6. API phản hồi với tài khoản đã xác thực/tạo mới
+    * Endpoint: /api/user/response
+    * ETA: 2-3 giờ
+    * Mô tả: Phát triển endpoint để phản hồi về Frontend với thông tin tài khoản đã được xác thực hoặc tạo mới thành công.
+7. API chỉnh sửa và lưu thông tin cá nhân
+    * Endpoint: /api/user/edit
+    * ETA: 4-5 giờ
+    * Mô tả: Phát triển endpoint để lưu trữ và chỉnh sửa thông tin cá nhân đã cập nhật của người dùng.
+Tổng cộng ETA cho Metamask/Login API:
+* ETA tổng cộng: 24-36 giờ
+
+ 1. Sub-Tab 1: Nạp tiền (Stripe)
+* Tổng cộng ETA: 8-11 giờ
+2. Sub-Tab 2: Option
+* Tổng cộng ETA: 4-6 giờ
+3. Sub-Tab 3: Chuyển token/ERC20
+* Tổng cộng ETA: 2-4 giờ
+4. Sub-Tab 4: Lịch sử giao dịch
+* Tổng cộng ETA: 5-7 giờ
+5. Contract trung gian
+* Tổng cộng ETA: 13-19 giờ
+6. NFT Contract
+* Tổng cộng ETA: 17.5-23 giờ
+7. API cho phần NFT
+* Tổng cộng ETA: 29.5-36 giờ
+8. Payment (Stripe & Coin)
+* Tổng cộng ETA: 24-33 giờ
+9. Metamask/Login API
+* Tổng cộng ETA: 24-36 giờ

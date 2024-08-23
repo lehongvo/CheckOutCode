@@ -10,7 +10,9 @@ import {
     SourceConditions,
     ActionConditions,
     genNewRules,
-    Currency
+    Currency,
+    ruleEngineDecode,
+    decodeNewRules
 } from './interface';
 
 export function createAndExecuteRule(
@@ -42,8 +44,7 @@ export function createAndExecuteRule(
             break;
     }
 
-    const rules = genNewRules(nameRuleEngine, structType, conditions, pointAmounts, isSelectVoucher, conditionType, currency);
-    console.log(`${rules}`);
+    const rules = genNewRules(nameRuleEngine, structType, conditions, pointAmounts, isSelectVoucher, conditionType, currency, 1724235564, 1725220170, 1724230974, 1724230974);
     console.log(`======================================${structType}======================================`);
     return rules;
 }
@@ -51,149 +52,153 @@ export function createAndExecuteRule(
 // Cart Examples
 
 // // Example 1: Cart - Total >= <Number>
-const cartConditionsTotal: CartConditions = {
-    total: 500
-};
-const role = createAndExecuteRule(
-    "Cart - Total",
-    'Cart',
-    cartConditionsTotal,
-    [1000],
-    true,
-    ConditionType.EQUALS_OR_GREATER_THAN,
-    [Currency.USD]
-);
+// const cartConditionsTotal: CartConditions = {
+//     total: 500
+// };
+// const role = createAndExecuteRule(
+//     "Cart - Total",
+//     'Cart',
+//     cartConditionsTotal,
+//     [1000, 1231],
+//     true,
+//     ConditionType.EQUALS_OR_GREATER_THAN,
+//     [Currency.USD, Currency.EUR]
+// );
 
 // Example 2: Cart - Amount >= <Number>
-const cartConditionsAmount: CartConditions = {
-    amount: 300
-};
-const role1 = createAndExecuteRule(
-    "Cart - Amount",
-    'Cart',
-    cartConditionsAmount,
-    [1000],
-    true,
-    ConditionType.EQUALS_OR_GREATER_THAN,
-    [Currency.USD]
-);
+// const cartConditionsAmount: CartConditions = {
+//     amount: 300
+// };
+// const role1 = createAndExecuteRule(
+//     "Cart - Amount",
+//     'Cart',
+//     cartConditionsAmount,
+//     [1000],
+//     true,
+//     ConditionType.EQUALS_OR_GREATER_THAN,
+//     [Currency.USD]
+// );
 
 // Example 3: Cart - Place Order Date between StartDate & EndDate
-const cartConditionsPlaceOrderDate: CartConditions = {
-    placeOrderDate: {
-        startDate: '2024-08-01',
-        endDate: '2024-08-31'
-    }
-};
-createAndExecuteRule(
-    "Cart - Place Order",
-    'Cart',
-    cartConditionsPlaceOrderDate,
-    [1000],
-    true,
-    ConditionType.IS,
-    [Currency.EUR]
-);
+// const cartConditionsPlaceOrderDate: CartConditions = {
+//     placeOrderDate: 1724236613
+// };
+// createAndExecuteRule(
+//     "CartPlaceOrder",
+//     'Cart',
+//     cartConditionsPlaceOrderDate,
+//     [1000],
+//     true,
+//     ConditionType.IS,
+//     [Currency.USD]
+// );
 
-// Product Examples
+// // Product Examples
 
-// Example 4: Product - SKU = "SKU1"
-const productConditionsSKU: ProductConditions = {
-    sku: SKU.SKU1
-};
-createAndExecuteRule(
-    "Product - SKU",
-    'Product',
-    productConditionsSKU,
-    [500], false, ConditionType.IS, [Currency.THB]);
+// // Example 4: Product - SKU = "SKU1"
+// const productConditionsSKU: ProductConditions = {
+//     sku: SKU.SKU1
+// };
+// createAndExecuteRule(
+//     "Product - SKU",
+//     'Product',
+//     productConditionsSKU,
+//     [500], false, ConditionType.IS, [Currency.THB]);
 
-// Example 5: Product - SKU in (SKU1, SKU2, SKU3)
-const productConditionsSKUs: ProductConditions = {
-    skus: [SKU.SKU1, SKU.SKU2, SKU.SKU3]
-};
-createAndExecuteRule(
-    "Product - SKU",
-    'Product', productConditionsSKUs, [500], true, ConditionType.IS_ONE_OF, [Currency.USD]);
+// // Example 5: Product - SKU in (SKU1, SKU2, SKU3)
+// const productConditionsSKUs: ProductConditions = {
+//     skus: [SKU.SKU1, SKU.SKU2, SKU.SKU3]
+// };
+// createAndExecuteRule(
+//     "Product - SKU",
+//     'Product', productConditionsSKUs, [500], true, ConditionType.IS_ONE_OF, [Currency.USD]);
 
-// Example 6: Product - Category = "Category 1"
-const productConditionsCategory: ProductConditions = {
-    category: Category.Category1
-};
-createAndExecuteRule("Product - Category", 'Product', productConditionsCategory, [500], false, ConditionType.IS, [Currency.VND]);
+// // Example 6: Product - Category = "Category 1"
+// const productConditionsCategory: ProductConditions = {
+//     category: Category.Category1
+// };
+// createAndExecuteRule("Product - Category", 'Product', productConditionsCategory, [500], false, ConditionType.IS, [Currency.VND]);
 
-// Example 7: Product - Category in (Category 1, Category 2, Category 3)
-const productConditionsCategories: ProductConditions = {
-    categories: [Category.Category1, Category.Category2, Category.Category3]
-};
-createAndExecuteRule("Product - Category", 'Product', productConditionsCategories, [500], true, ConditionType.IS_ONE_OF, [Currency.EUR]);
+// // Example 7: Product - Category in (Category 1, Category 2, Category 3)
+// const productConditionsCategories: ProductConditions = {
+//     categories: [Category.Category1, Category.Category2, Category.Category3]
+// };
+// createAndExecuteRule("Product - Category", 'Product', productConditionsCategories, [500], true, ConditionType.IS_ONE_OF, [Currency.EUR]);
 
-// Example 8: Product - Attribute Tag = "Value 1"
-const productConditionsAttribute: ProductConditions = {
-    attribute: {
-        tag: "Tag1",
-        value: "Value 1"
-    }
-};
-createAndExecuteRule("Product - Attribute Tag", 'Product', productConditionsAttribute, [500], false, ConditionType.IS, [Currency.THB]);
+// // Example 8: Product - Attribute Tag = "Value 1"
+// const productConditionsAttribute: ProductConditions = {
+//     attribute: {
+//         tag: "Tag1"
+//     }
+// };
+// createAndExecuteRule("Product - Attribute Tag", 'Product', productConditionsAttribute, [500], false, ConditionType.IS, [Currency.THB]);
 
-// Customer Examples
-// Example 9: Customer - Tier = Tier 1
-const customerConditionsTier: CustomerConditions = {
-    tier: Tier.Tier1
-};
-createAndExecuteRule("Customer - Tier", 'Customer', customerConditionsTier, [2000], false, ConditionType.IS, [Currency.USD]);
+// // Customer Examples
+// // Example 9: Customer - Tier = Tier 1
+// const customerConditionsTier: CustomerConditions = {
+//     tier: Tier.Tier1
+// };
+// createAndExecuteRule("Customer - Tier", 'Customer', customerConditionsTier, [2000], false, ConditionType.IS, [Currency.USD]);
 
-// Example 10: Customer - Register Date between StartDate & EndDate
-const customerConditionsRegisterDate: CustomerConditions = {
-    registerDate: {
-        startDate: '2024-01-01',
-        endDate: '2024-12-31'
-    }
-};
-createAndExecuteRule("Customer - Register", 'Customer', customerConditionsRegisterDate, [1500], true, ConditionType.IS, [Currency.VND]);
+// // Example 10: Customer - Register Date between StartDate & EndDate
+// const customerConditionsRegisterDate: CustomerConditions = {
+//     registerDate: 1724230974
+// };
+// createAndExecuteRule("Customer - Register", 'Customer', customerConditionsRegisterDate, [1500], true, ConditionType.IS, [Currency.VND]);
 
-// Example 11: Customer - CLV >= "CLV 1"
-const customerConditionsCLV: CustomerConditions = {
-    clv: 1000
-};
-createAndExecuteRule("Customer - CLV", 'Customer', customerConditionsCLV, [1500], true, ConditionType.EQUALS_OR_GREATER_THAN, [Currency.EUR]);
+// // Example 11: Customer - CLV >= "CLV 1"
+// const customerConditionsCLV: CustomerConditions = {
+//     clv: 1000
+// };
+// createAndExecuteRule("Customer - CLV", 'Customer', customerConditionsCLV, [1500], true, ConditionType.EQUALS_OR_GREATER_THAN, [Currency.EUR]);
 
-// Source Examples
+// // Source Examples
 
-// Example 12: Source - Channel in (Online, Offline, Marketplace, Partner)
-const sourceConditionsChannels: SourceConditions = {
-    channels: [Channel.Online, Channel.Offline, Channel.Marketplace, Channel.Partner]
-};
-createAndExecuteRule("Source - Channel", 'Source', sourceConditionsChannels, [3000], true, ConditionType.IS_ONE_OF, [Currency.THB]);
+// // Example 12: Source - Channel in (Online, Offline, Marketplace, Partner)
+// const sourceConditionsChannels: SourceConditions = {
+//     channels: [Channel.Online, Channel.Offline, Channel.Marketplace, Channel.Partner]
+// };
+// createAndExecuteRule("Source - Channel", 'Source', sourceConditionsChannels, [3000], true, ConditionType.IS_ONE_OF, [Currency.THB]);
 
-// Example 13: Source - StoreID = "Store123"
-const sourceConditionsStoreId: SourceConditions = {
-    storeId: 'Store123'
-};
-createAndExecuteRule("Source - StoreID", 'Source', sourceConditionsStoreId, [3000], false, ConditionType.IS, [Currency.VND]);
+// // Example 13: Source - StoreID = "Store123"
+// const sourceConditionsStoreId: SourceConditions = {
+//     storeId: 'Store123'
+// };
+// createAndExecuteRule("Source - StoreID", 'Source', sourceConditionsStoreId, [3000], false, ConditionType.IS, [Currency.VND]);
 
-// Action Examples
+// // Action Examples
 
-// Example 14: Action - Event = Event ID
-const actionConditionsEventId: ActionConditions = {
-    eventId: 'Event456'
-};
-createAndExecuteRule("Action - Event", 'Action', actionConditionsEventId, [800], true, ConditionType.IS, [Currency.USD]);
+// // Example 14: Action - Event = Event ID
+// const actionConditionsEventId: ActionConditions = {
+//     eventId: 'Event456'
+// };
+// createAndExecuteRule("Action - Event", 'Action', actionConditionsEventId, [800], true, ConditionType.IS, [Currency.USD]);
 
-// Example 15: Action - Referral = Referral Code
-const actionConditionsReferralCode: ActionConditions = {
-    referalCode: 'ReferalCode123'
-};
-createAndExecuteRule("Action - Referral", 'Action', actionConditionsReferralCode, [800], false, ConditionType.IS, [Currency.VND]);
+// // Example 15: Action - Referral = Referral Code
+// const actionConditionsReferralCode: ActionConditions = {
+//     referalCode: 'ReferalCode123'
+// };
+// createAndExecuteRule("Action - Referral", 'Action', actionConditionsReferralCode, [800], false, ConditionType.IS, [Currency.VND]);
 
-// Example 16: Action - Game = Game ID
-const actionConditionsGameId: ActionConditions = {
-    gameId: 'Game789'
-};
-createAndExecuteRule("Action - Game", 'Action', actionConditionsGameId, [1000], true, ConditionType.IS, [Currency.EUR]);
+// // Example 16: Action - Game = Game ID
+// const actionConditionsGameId: ActionConditions = {
+//     gameId: 'Game789'
+// };
+// createAndExecuteRule("Action - Game", 'Action', actionConditionsGameId, [1000], true, ConditionType.IS, [Currency.EUR]);
 
-// Example 17: Action - Mission = Mission ID
-const actionConditionsMissionId: ActionConditions = {
-    missionId: 'Mission001'
-};
-createAndExecuteRule("Action - Mission", 'Action', actionConditionsMissionId, [1200], true, ConditionType.IS, [Currency.THB]);
+// // Example 17: Action - Mission = Mission ID
+// const actionConditionsMissionId: ActionConditions = {
+//     missionId: 'Mission001'
+// };
+// createAndExecuteRule("Action - Mission", 'Action', actionConditionsMissionId, [1200], true, ConditionType.IS, [Currency.THB]);
+
+// const encodedRuleText = "cnVsZSAiQ2FydCAtIFBsYWNlIE9yZGVyIiB7CiAgICB3aGVuCiAgICAgIDE3MjQyMzU1NjQgPD0gQ2FydC5QbGFjZU9yZGVyRGF0ZSAmJiAxNzI1MjIwMTcwID49IENhcnQuUGxhY2VPcmRlckRhdGUgJiYgQ2FydC5DdXJyZW5jeSA9PSAiVVNEIgogICAgdGhlbgogICAgICBDYXJ0LlJlc3VsdCA9ICJDb25kaXRpb24gbWV0IjsKICAgICAgQ2FydC5NaW50UG9pbnQgPSBDYXJ0LlRvdGFsIC8gMTAwMDsKICAgICAgQ2FydC5Wb3VjaGVyID0gdHJ1ZTsKfQ==";
+// const decodedRuleText = ruleEngineDecode(encodedRuleText);
+
+// console.log(decodedRuleText);
+
+decodeNewRules(
+    [
+        "cnVsZSAicnVsZSAxIiB7CiAgICAgIHdoZW4KICAgICAgICBQcm9kdWN0LkNhdGVnb3J5ID09ICJbb2JqZWN0IE9iamVjdF0iICYmIFByb2R1Y3QuQ3VycmVuY3kgPT0gIlVTRCIKICAgICAgdGhlbgogICAgICAgIFByb2R1Y3QuUmVzdWx0ID0gIkNvbmRpdGlvbiBtZXQiOwogICAgICAgIFByb2R1Y3QuTWludFBvaW50ID0gUHJvZHVjdC5Ub3RhbCAvIDE7CiAgICAgICAgUHJvZHVjdC5Wb3VjaGVyID0gZmFsc2U7CiAgICAgICAgUmV0cmFjdCgicnVsZSAxIik7CiAgfQ"
+    ]
+)
