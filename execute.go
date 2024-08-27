@@ -5,11 +5,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-
-	"github.com/hyperjumptech/grule-rule-engine/ast"
-	"github.com/hyperjumptech/grule-rule-engine/builder"
-	"github.com/hyperjumptech/grule-rule-engine/engine"
-	"github.com/hyperjumptech/grule-rule-engine/pkg"
 )
 
 // Enum for Channel
@@ -63,7 +58,7 @@ type Item struct {
 	MissionID    string
 
 	Result    string
-	MintPoint int
+	MintPoint float64
 	Voucher   bool
 
 	Currency string
@@ -91,39 +86,41 @@ func ruleEngineDecode(encodedRuleText string) (string, error) {
 
 func applyRules(item *Item, encodedRuleValue string, ruleName string, version string) error {
 	ruleString, err := ruleEngineDecode(encodedRuleValue)
+	fmt.Println(ruleString)
 	if err != nil {
 		return fmt.Errorf("Error decoding rule: %v", err)
 	}
 
-	updatedRuleString := updateRuleString(ruleString)
+	// updatedRuleString := updateRuleString(ruleString)
+	// fmt.Println(ruleString)
 
-	dataContext := ast.NewDataContext()
-	err = dataContext.Add("Item", item)
-	if err != nil {
-		return err
-	}
+	// dataContext := ast.NewDataContext()
+	// err = dataContext.Add("Item", item)
+	// if err != nil {
+	// 	return err
+	// }
 
-	kb := ast.NewKnowledgeLibrary()
-	ruleBuilder := builder.NewRuleBuilder(kb)
+	// kb := ast.NewKnowledgeLibrary()
+	// ruleBuilder := builder.NewRuleBuilder(kb)
 
-	resource := pkg.NewBytesResource([]byte(updatedRuleString))
-	err = ruleBuilder.BuildRuleFromResource(ruleName, version, resource)
-	if err != nil {
-		return fmt.Errorf("failed to build rule '%s': %v", ruleName, err)
-	}
+	// resource := pkg.NewBytesResource([]byte(updatedRuleString))
+	// err = ruleBuilder.BuildRuleFromResource(ruleName, version, resource)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to build rule '%s': %v", ruleName, err)
+	// }
 
-	knowledgeBase, err := kb.NewKnowledgeBaseInstance(ruleName, version)
-	if err != nil {
-		return fmt.Errorf("failed to create knowledge base for rule '%s': %v", ruleName, err)
-	}
+	// knowledgeBase, err := kb.NewKnowledgeBaseInstance(ruleName, version)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to create knowledge base for rule '%s': %v", ruleName, err)
+	// }
 
-	eng := engine.NewGruleEngine()
-	eng.MaxCycle = 1000
+	// eng := engine.NewGruleEngine()
+	// eng.MaxCycle = 1000
 
-	err = eng.Execute(dataContext, knowledgeBase)
-	if err != nil {
-		return fmt.Errorf("failed to execute rule engine for rule '%s': %v", ruleName, err)
-	}
+	// err = eng.Execute(dataContext, knowledgeBase)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to execute rule engine for rule '%s': %v", ruleName, err)
+	// }
 
 	return nil
 }
@@ -140,7 +137,7 @@ func updateRuleString(ruleString string) string {
 
 func main() {
 	item := &Item{
-		Total:          10000000,
+		Total:          825,
 		Amount:         9000000,
 		PlaceOrderDate: 1724235564,
 		SKU:            "SKU1",
@@ -151,7 +148,7 @@ func main() {
 		DebugLog:       "",
 	}
 
-	encodedRuleValue := `cnVsZSAiQ2FydFBsYWNlT3JkZXIiIHsKICAgIHdoZW4KICAgICAgMTcyNDIzNTU2NCA8PSBDYXJ0LlBsYWNlT3JkZXJEYXRlICYmIDE3MjUyMjAxNzAgPj0gQ2FydC5QbGFjZU9yZGVyRGF0ZSAmJiBDYXJ0LkN1cnJlbmN5ID09ICJVU0QiCiAgICB0aGVuCiAgICAgIENhcnQuUmVzdWx0ID0gIkNvbmRpdGlvbiBtZXQiOwogICAgICBDYXJ0Lk1pbnRQb2ludCA9IENhcnQuVG90YWwgLyAxMDAwOwogICAgICBDYXJ0LlZvdWNoZXIgPSB0cnVlOwogICAgICBSZXRyYWN0KCJDYXJ0UGxhY2VPcmRlciIpOwp9`
+	encodedRuleValue := `cnVsZSAiUmV3YXJkIFBvaW50IDIiIHsKICAgICAgd2hlbgogICAgICAgIENhcnQuVG90YWwgPj0gMjAwICYmIENhcnQuQ3VycmVuY3kgPT0gIlVTRCIKICAgICAgdGhlbgogICAgICAgIENhcnQuUmVzdWx0ID0gIkNvbmRpdGlvbiBtZXQiOwogICAgICAgIENhcnQuTWludFBvaW50ID0gQ2FydC5Ub3RhbCAvIDAuMDE7CiAgICAgICAgQ2FydC5Wb3VjaGVyID0gZmFsc2U7CiAgICAgICAgUmV0cmFjdCgiUmV3YXJkIFBvaW50IDIiKTsKICB9`
 
 	err := applyRules(item, encodedRuleValue, "CartAmount", "0.1.0")
 	if err != nil {
@@ -160,8 +157,3 @@ func main() {
 
 	fmt.Printf("Item after rule execution: %+v\n", item)
 }
-
-[VoLH][Nodejs][backend][Update value each other structure by id]
-[VoLH][Nodejs][backend][Returns date, month, year information (currently returning the number of days in the month)]
-[VoLH][Backend][nodejs][sub-admin][Ad new api average-session]
-[VoLH][Backend][nodejs][sub-admin][Add average in getTransactionStatsWithAnyTime]

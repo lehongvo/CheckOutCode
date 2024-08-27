@@ -11,16 +11,18 @@ import {
     ActionConditions,
     genNewRules,
     Currency,
-    ruleEngineDecode,
-    decodeNewRules
+    // genNewRulesRedeem,
+    PointAmounts,
+    VoucherAmounts
 } from './interface';
+import { decodeNewRules } from './webDecode';
 
-export function createAndExecuteRule(
+export function createAndExecuteRule01(
     nameRuleEngine: string,
     structType: 'Cart' | 'Product' | 'Customer' | 'Source' | 'Action',
     specificConditions: any,
     pointAmounts: number[],
-    isSelectVoucher: boolean,
+    isSelectVoucherListParams: string[],
     conditionType: ConditionType,
     currency: Currency[]
 ) {
@@ -44,26 +46,29 @@ export function createAndExecuteRule(
             break;
     }
 
-    const rules = genNewRules(nameRuleEngine, structType, conditions, pointAmounts, isSelectVoucher, conditionType, currency, 1724235564, 1725220170, 1724230974, 1724230974);
+    const rules = genNewRules(nameRuleEngine, structType, conditions, pointAmounts, isSelectVoucherListParams, conditionType, currency, 1724235564, 1725220170, 1724230974, 1724230974, ["123123", "23423d23"]);
     console.log(`======================================${structType}======================================`);
     return rules;
 }
 
+const isSelectVoucherList: string[] = ["983h2d192837h328fo223f2", "9823h9283ỳ7238ỳh23f23i987"]
+
 // Cart Examples
 
-// // Example 1: Cart - Total >= <Number>
-// const cartConditionsTotal: CartConditions = {
-//     total: 500
-// };
-// const role = createAndExecuteRule(
-//     "Cart - Total",
-//     'Cart',
-//     cartConditionsTotal,
-//     [1000, 1231],
-//     true,
-//     ConditionType.EQUALS_OR_GREATER_THAN,
-//     [Currency.USD, Currency.EUR]
-// );
+// Example 1: Cart - Total >= <Number>
+const cartConditionsTotal: CartConditions = {
+    total: 500
+};
+const role = createAndExecuteRule01(
+    "Cart - Total",
+    'Cart',
+    cartConditionsTotal,
+    [1000],
+    isSelectVoucherList,
+    ConditionType.EQUALS_OR_GREATER_THAN,
+    [Currency.USD]
+);
+console.log(role);
 
 // Example 2: Cart - Amount >= <Number>
 // const cartConditionsAmount: CartConditions = {
@@ -79,19 +84,21 @@ export function createAndExecuteRule(
 //     [Currency.USD]
 // );
 
-// Example 3: Cart - Place Order Date between StartDate & EndDate
+// // Example 3: Cart - Place Order Date between StartDate & EndDate
 // const cartConditionsPlaceOrderDate: CartConditions = {
 //     placeOrderDate: 1724236613
 // };
-// createAndExecuteRule(
+
+// const data = createAndExecuteRule01(
 //     "CartPlaceOrder",
 //     'Cart',
 //     cartConditionsPlaceOrderDate,
 //     [1000],
-//     true,
+//     isSelectVoucherList,
 //     ConditionType.IS,
 //     [Currency.USD]
 // );
+// console.log(data);
 
 // // Product Examples
 
@@ -197,8 +204,89 @@ export function createAndExecuteRule(
 
 // console.log(decodedRuleText);
 
-decodeNewRules(
-    [
-        "cnVsZSAicnVsZSAxIiB7CiAgICAgIHdoZW4KICAgICAgICBQcm9kdWN0LkNhdGVnb3J5ID09ICJbb2JqZWN0IE9iamVjdF0iICYmIFByb2R1Y3QuQ3VycmVuY3kgPT0gIlVTRCIKICAgICAgdGhlbgogICAgICAgIFByb2R1Y3QuUmVzdWx0ID0gIkNvbmRpdGlvbiBtZXQiOwogICAgICAgIFByb2R1Y3QuTWludFBvaW50ID0gUHJvZHVjdC5Ub3RhbCAvIDE7CiAgICAgICAgUHJvZHVjdC5Wb3VjaGVyID0gZmFsc2U7CiAgICAgICAgUmV0cmFjdCgicnVsZSAxIik7CiAgfQ"
-    ]
-)
+// decodeNewRules(
+//     [
+//         "cnVsZSAicnVsZSAxIiB7CiAgICAgIHdoZW4KICAgICAgICBQcm9kdWN0LkNhdGVnb3J5ID09ICJbb2JqZWN0IE9iamVjdF0iICYmIFByb2R1Y3QuQ3VycmVuY3kgPT0gIlVTRCIKICAgICAgdGhlbgogICAgICAgIFByb2R1Y3QuUmVzdWx0ID0gIkNvbmRpdGlvbiBtZXQiOwogICAgICAgIFByb2R1Y3QuTWludFBvaW50ID0gUHJvZHVjdC5Ub3RhbCAvIDE7CiAgICAgICAgUHJvZHVjdC5Wb3VjaGVyID0gZmFsc2U7CiAgICAgICAgUmV0cmFjdCgicnVsZSAxIik7CiAgfQ"
+//     ]
+// )
+
+// export function createAndExecuteRule(
+//     nameRuleEngine: string,
+//     structType: 'Cart' | 'Product' | 'Customer' | 'Source' | 'Action',
+//     specificConditions: any,
+//     isSelectVoucher: boolean,
+//     conditionType: ConditionType
+// ) {
+//     let conditions: any;
+
+//     switch (structType) {
+//         case 'Cart':
+//             conditions = specificConditions as CartConditions;
+//             break;
+//         case 'Product':
+//             conditions = specificConditions as ProductConditions;
+//             break;
+//         case 'Customer':
+//             conditions = specificConditions as CustomerConditions;
+//             break;
+//         case 'Source':
+//             conditions = specificConditions as SourceConditions;
+//             break;
+//         case "Action":
+//             conditions = specificConditions as ActionConditions;
+//             break;
+//     }
+
+//     const value1: PointAmounts = {
+//         value: 123123,
+//         selectProduct: "Phone",
+//         currency: Currency.USD
+//     }
+
+//     const value2: VoucherAmounts = {
+//         discount: 30,
+//         selectProduct: "Table",
+//         isFixDiscount: true,
+//         currency: Currency.USD
+//     }
+
+//     const rules = genNewRulesRedeem(
+//         nameRuleEngine,
+//         structType,
+//         conditions,
+//         isSelectVoucher,
+//         conditionType,
+//         1724235564,
+//         1725220170,
+//         1724230974,
+//         1724230974,
+//         [
+//             value1
+//         ],
+//         [
+//             value2
+//         ]
+//     );
+//     console.log(rules);
+//     console.log(`======================================${structType}======================================`);
+//     return rules;
+// }
+
+// Example 1: Cart - Total >= <Number>
+// const cartConditionsTotal: CartConditions = {
+//     total: 500
+// };
+// const role = createAndExecuteRule(
+//     "Cart - Total",
+//     'Cart',
+//     cartConditionsTotal,
+//     true,
+//     ConditionType.EQUALS_OR_GREATER_THAN,
+// );
+
+// decodeNewRules(
+//     [
+//         "cnVsZSAiUnVsZSAyIiB7CiAgICAgIHdoZW4KICAgICAgICAxNzI0NDMyNDAwIDw9IEN1c3RvbWVyLlJlZ2lzdGVyRGF0ZSAmJiAxNzI1MTIzNjAwID49IEN1c3RvbWVyLlJlZ2lzdGVyRGF0ZSAmJiBDdXN0b21lci5DdXJyZW5jeSA9PSAiVVNEIgogICAgICB0aGVuCiAgICAgICAgQ3VzdG9tZXIuUmVzdWx0ID0gIkNvbmRpdGlvbiBtZXQiOwogICAgICAgIEN1c3RvbWVyLk1pbnRQb2ludCA9IEN1c3RvbWVyLlRvdGFsIC8gMTsKICAgICAgICBDdXN0b21lci5Wb3VjaGVyID0gZmFsc2U7CiAgICAgICAgUmV0cmFjdCgiUnVsZSAyIik7CiAgfQ=="
+//     ]
+// )
+
