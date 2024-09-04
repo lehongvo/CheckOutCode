@@ -20,8 +20,15 @@ function decodeNewRules(encodedRules) {
 
         console.log("===========> Your rule string is: \n" + ruleString);
 
-        // Match the value field (e.g., Customer.RegisterDate, Cart.PlaceOrderDate, Product.Category, Customer.Birthday)
-        const valueFieldMatch = ruleString.match(/(Customer\.RegisterDate|Cart\.PlaceOrderDate|Cart\.Total|Product\.Category|Cart\.Amount|Customer\.Birthday)/);
+        let valueFieldMatch = null;
+
+        if (!ruleString.includes('when\n        1 == 1')) {
+            // Match the value field (e.g., Customer.RegisterDate, Cart.PlaceOrderDate, Product.Category, Customer.Birthday)
+            valueFieldMatch = ruleString.match(
+                /(Customer\.RegisterDate|Product\.Sku|Customer\.Tier|Customer\.Clv|Action\.GameId|Cart\.PlaceOrderDate|Cart\.Total|Product\.Category|Cart\.Amount|Customer\.Birthday)/,
+            );
+        }
+
         const valueField = valueFieldMatch ? valueFieldMatch[0].replace('.', ' ') : null;
 
         // Match the operator (==, !=, >=, <=, >, <)
@@ -33,6 +40,8 @@ function decodeNewRules(encodedRules) {
         // Match the currency (USD, VND, etc.)
         let valueCurrency = "";
         let typeValue = "";
+        let pointValue = null;
+        let isAmount = true;
 
         // Special handling for date ranges and exact matches (e.g., Customer.RegisterDate, Cart.PlaceOrderDate, Customer.Birthday)
         if (valueField && (valueField.includes('RegisterDate') || valueField.includes('PlaceOrderDate') || valueField.includes('Birthday'))) {
@@ -44,7 +53,7 @@ function decodeNewRules(encodedRules) {
                 const exactDateMatch = ruleString.match(/(==)\s+(\d+)/);
                 operatorData = exactDateMatch ? exactDateMatch[2] : null;
             }
-            typeValue = "date"
+            typeValue = "date";
         } else {
             // Normal operator data (single value, could be a number or a string)
             const operatorDataMatch = ruleString.match(/(==|!=|>=|<=|>|<)\s+("[^"]*"|\d+(\.\d+)?)/);
@@ -53,23 +62,53 @@ function decodeNewRules(encodedRules) {
             if (valueField && valueCurrencyMatch && !valueField.includes('Birthday')) {
                 valueCurrency = CURRENCY_SYMBOLS[valueCurrencyMatch[1]] || "";
             }
-            if (valueField.includes('Amount') || valueField.includes('Total')) {
-                typeValue = "number"
+            if (
+                valueField && (valueField.includes('Amount') ||
+                    valueField.includes('Total'))
+            ) {
+                typeValue = "number";
             } else {
-                typeValue = "string"
+                typeValue = "string";
             }
         }
 
-        if (valueField.includes('Category')) {
+        // Extract Voucher array if it exists
+        let selectID = [];
+        const voucherMatch = ruleString.match(/Voucher\s*=\s*\[([^\]]+)\];/);
+        if (voucherMatch) {
+            selectID = voucherMatch[1].split(',').map(v => v.trim().replace(/"/g, ''));
+        }
+
+        // Extract MintPoint and determine if it's an amount or a calculation
+        const mintPointMatch = ruleString.match(/MintPoint\s*=\s*(.*?);/);
+        if (mintPointMatch) {
+            const mintPointExpression = mintPointMatch[1].trim();
+            if (/[+\-*/]/.test(mintPointExpression)) {
+                isAmount = false;
+                // Extract the numeric value from the expression
+                const valueMatch = mintPointExpression.match(/\/\s*(\d+(\.\d+)?)/);
+                if (valueMatch) {
+                    pointValue = parseFloat(valueMatch[1]);
+                }
+            } else {
+                pointValue = parseFloat(mintPointExpression);
+            }
+        }
+
+        // Ensure valueField is not null before using includes
+        if (valueField && valueField.includes('Category')) {
             valueCurrency = "";
         }
 
         return {
-            ValueField: valueField,
+            valueField: valueField,
             operator: operator,
             operatorData: operatorData,
-            ValueCurrency: valueCurrency,
-            typeValue
+            valueCurrency: valueCurrency,
+            typeValue,
+            pointValue: pointValue,
+            isAmount: isAmount,
+            selectIdList: selectID
         };
     });
 
@@ -78,8 +117,14 @@ function decodeNewRules(encodedRules) {
     return decodedRules;
 }
 
+const functionTest = (encodedRule) => {
+    const ruleString = Buffer.from(encodedRule, 'base64').toString('utf-8');
+    console.log("===========> Your rule string is: \n" + ruleString);
+}
+
+// Test case
 decodeNewRules(
-    [
-        "cnVsZSAiUnVsZV82IiB7CiAgICAgIHdoZW4KICAgICAgICBDYXJ0LlRvdGFsID09IDEyMSAmJiBDYXJ0LkN1cnJlbmN5ID09ICJVU0QiCiAgICAgIHRoZW4KICAgICAgICBDYXJ0LlJlc3VsdCA9ICJDb25kaXRpb24gbWV0IjsKICAgICAgICBDYXJ0Lk1pbnRQb2ludCA9IENhcnQuVG90YWwgLyAyOwogICAgICAgIENhcnQuVm91Y2hlciA9IFsiYWRkMTY5Y2QtNjVjZi00YzlhLTg5NWMtZDRiYmY1MTg0ZTI4IiwiODQ0ZjQ0OWEtYWI2My00NTBmLWIyMTUtMWMwZGQ1ZDE1YTcwIl07CiAgICAgICAgUmV0cmFjdCgiUnVsZV82Iik7CiAgfQ=="
-    ]
-)
+    "cnVsZSAiUnVsZV8xMCIgewogICAgICB3aGVuCiAgICAgICAgMSA9PSAxCiAgICAgIHRoZW4KICAgICAgICBDYXJ0LlJlc3VsdCA9ICJDb25kaXRpb24gbWV0IjsKICAgICAgICBDYXJ0Lk1pbnRQb2ludCA9IENhcnQuVG90YWwgLyAyOwogICAgICAgIENhcnQuVm91Y2hlciA9IFsiIl07CiAgICAgICAgUmV0cmFjdCgiUnVsZV8xMCIpOwogIH0="
+);
+
+

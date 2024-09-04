@@ -339,167 +339,70 @@ export interface VoucherAmounts {
     currency: Currency,
 }
 
-// export function genNewRulesRedeem(
-//     convertRuleString: string,
-//     Struct: 'Cart' | 'Product' | 'Customer' | 'Source' | 'Action',
-//     conditions: CartConditions | ProductConditions | CustomerConditions | SourceConditions | ActionConditions,
-//     isSelectVoucher: boolean = false,
-//     operator: ConditionType = ConditionType.IS,
-//     startTime: number,
-//     endTime: number,
-//     registerStartTime: number,
-//     registerEndTime: number,
-//     pointAmounts: PointAmounts[],
-//     voucherAmount: VoucherAmounts[]
-// ): string[] {
-//     let listRules: string[] = [];
+export function genNewRulesRedeem(
+    convertRuleString: string,
+    Struct: 'Cart' | 'Product' | 'Customer' | 'Source' | 'Action',
+    conditions: CartConditions | ProductConditions | CustomerConditions | SourceConditions | ActionConditions,
+    operator: ConditionType = ConditionType.IS,
+    startTime: number,
+    endTime: number,
+    registerStartTime: number,
+    registerEndTime: number,
+    pointAmounts: PointAmounts[],
+    voucherAmount: VoucherAmounts[]
+): string[] {
+    let listRules: string[] = [];
+    let valueOfVoucherAmount: string[] = [];
+    let valueOfPointAmounts: string[] = [];
+    let whenStringRuleOfCurrency = "";
 
-//     for (let i = 0; i < pointAmounts.length; i++) {
-//         let rules: string = "";
-//         switch (Struct) {
-//             case 'Cart':
-//                 const cartConditions = conditions as CartConditions;
-//                 if (cartConditions.placeOrderDate) {
-//                     let ruleString = `rule "${convertRuleString}" {\n`;
-//                     ruleString += `    when\n      ${startTime} <= ${Struct}.PlaceOrderDate && ${endTime} >= ${Struct}.PlaceOrderDate && ${Struct}.Currency == "${pointAmounts[i].currency}"\n`;
-//                     ruleString += `    then\n      ${Struct}.Result = "Condition met";\n      Retract("${convertRuleString}");\n`;
-//                     ruleString += `}`;
-//                     rules = ruleString;
-//                 }
-//                 if (cartConditions.amount) {
-//                     let ruleString = `rule "${convertRuleString}" {\n`;
-//                     ruleString += `    when\n      ${Struct}.Amount ${operator} ${cartConditions.amount} && ${Struct}.Currency == "${pointAmounts[i].currency}"\n`;
-//                     ruleString += `    then\n      ${Struct}.Result = "Condition met";\n      Retract("${convertRuleString}");\n`;
-//                     ruleString += `}`;
-//                     rules = ruleString;
-//                 }
-//                 if (cartConditions.total) {
-//                     let ruleString = `rule "${Struct}" {\n`;
-//                     ruleString += `    when\n      ${Struct}.Total ${operator} ${cartConditions.total} && ${Struct}.Currency == "${pointAmounts[i].currency}"\n`;
-//                     ruleString += `    then\n      ${Struct}.Result = "Condition met";\n      Retract("${convertRuleString}");\n`;
-//                     ruleString += `}`;
-//                     rules = ruleString;
-//                 }
-//             //             //         break;
-//             //             //     case 'Product':
-//             //             //         const productConditions = conditions as ProductConditions;
-//             //             //         if (productConditions.sku) {
-//             //             //             let ruleString = `rule "${convertRuleString}" {\n`;
-//             //             //             ruleString += `    when\n      ${Struct}.Sku ${operator} "${productConditions.sku}" && ${Struct}.Currency == "${currency[i]}"\n`;
-//             //             //             ruleString += `    then\n      ${Struct}.Result = "Condition met";\n      ${Struct}.MintPoint = ${Struct}.Total / ${pointAmounts[i]};\n      ${Struct}.Voucher = ${isSelectVoucher};\n      Retract("${convertRuleString}");\n`;
-//             //             //             ruleString += `}`;
-//             //             //             rules = ruleString;
-//             //             //         }
-//             //             //         if (productConditions.skus) {
-//             //             //             let ruleString = `rule "${convertRuleString}" {\n`;
-//             //             //             ruleString += `    when\n      ${Struct}.Sku ${operator} (${productConditions.skus.map(sku => `"${sku}"`).join(', ')}) && ${Struct}.Currency == "${currency[i]}"\n`;
-//             //             //             ruleString += `    then\n      ${Struct}.Result = "Condition met";\n      ${Struct}.MintPoint = ${Struct}.Total / ${pointAmounts[i]};\n      ${Struct}.Voucher = ${isSelectVoucher};\n      Retract("${convertRuleString}");\n`;
-//             //             //             ruleString += `}`;
-//             //             //             rules = ruleString;
-//             //             //         }
-//             //             //         if (productConditions.category) {
-//             //             //             let ruleString = `rule "${convertRuleString}" {\n`;
-//             //             //             ruleString += `    when\n      ${Struct}.Category ${operator} "${productConditions.category}" && ${Struct}.Currency == "${currency[i]}"\n`;
-//             //             //             ruleString += `    then\n      ${Struct}.Result = "Condition met";\n      ${Struct}.MintPoint = ${Struct}.Total / ${pointAmounts[i]};\n      ${Struct}.Voucher = ${isSelectVoucher};\n      Retract("${convertRuleString}");\n`;
-//             //             //             ruleString += `}`;
-//             //             //             rules = ruleString;
-//             //             //         }
-//             //             //         if (productConditions.categories) {
-//             //             //             let ruleString = `rule "${convertRuleString}" {\n`;
-//             //             //             ruleString += `    when\n      ${Struct}.Category ${operator} (${productConditions.categories.map(cat => `"${cat}"`).join(', ')}) && ${Struct}.Currency == "${currency[i]}"\n`;
-//             //             //             ruleString += `    then\n      ${Struct}.Result = "Condition met";\n      ${Struct}.MintPoint = ${Struct}.Total / ${pointAmounts[i]};\n      ${Struct}.Voucher = ${isSelectVoucher};\n      Retract("${convertRuleString}");\n`;
-//             //             //             ruleString += `}`;
-//             //             //             rules = ruleString;
-//             //             //         }
-//             //             //         if (productConditions.attribute) {
-//             //             //             let ruleString = `rule "${convertRuleString}" {\n`;
-//             //             //             ruleString += `    when\n      ${Struct}.Attribute.Tag ${operator} "${productConditions.attribute.tag}" && ${Struct}.Currency == "${currency[i]}"\n`;
-//             //             //             ruleString += `    then\n      ${Struct}.Result = "Condition met";\n      ${Struct}.MintPoint = ${Struct}.Total / ${pointAmounts[i]};\n      ${Struct}.Voucher = ${isSelectVoucher};\n      Retract("${convertRuleString}");\n`;
-//             //             //             ruleString += `}`;
-//             //             //             rules = ruleString;
-//             //             //         }
-//             //             //         break;
-//             //             //     case 'Customer':
-//             //             //         const customerConditions = conditions as CustomerConditions;
-//             //             //         if (customerConditions.tier) {
-//             //             //             let ruleString = `rule "${convertRuleString}" {\n`;
-//             //             //             ruleString += `    when\n      ${Struct}.Tier ${operator} "${customerConditions.tier}" && ${Struct}.Currency == "${currency[i]}"\n`;
-//             //             //             ruleString += `    then\n      ${Struct}.Result = "Condition met";\n      ${Struct}.MintPoint = ${Struct}.Total / ${pointAmounts[i]};\n      ${Struct}.Voucher = ${isSelectVoucher};\n      Retract("${convertRuleString}");\n`;
-//             //             //             ruleString += `}`;
-//             //             //             rules = ruleString;
-//             //             //         }
-//             //             //         if (customerConditions.registerDate) {
-//             //             //             let ruleString = `rule "${convertRuleString}" {\n`;
-//             //             //             ruleString += `    when\n      ${registerStartTime} <= ${Struct}.RegisterDate && ${registerEndTime} >= ${Struct}.RegisterDate && ${Struct}.Currency == "${currency[i]}"\n`;
-//             //             //             ruleString += `    then\n      ${Struct}.Result = "Condition met";\n      ${Struct}.MintPoint = ${Struct}.Total / ${pointAmounts[i]};\n      ${Struct}.Voucher = ${isSelectVoucher};\n      Retract("${convertRuleString}");\n`;
-//             //             //             ruleString += `}`;
-//             //             //             rules = ruleString;
-//             //             //         }
-//             //             //         if (customerConditions.clv) {
-//             //             //             let ruleString = `rule "${convertRuleString}" {\n`;
-//             //             //             ruleString += `    when\n      ${Struct}.Clv ${operator} ${customerConditions.clv} && ${Struct}.Currency == "${currency[i]}"\n`;
-//             //             //             ruleString += `    then\n      ${Struct}.Result = "Condition met";\n      ${Struct}.MintPoint = ${Struct}.Total / ${pointAmounts[i]};\n      ${Struct}.Voucher = ${isSelectVoucher};\n      Retract("${convertRuleString}");\n`;
-//             //             //             ruleString += `}`;
-//             //             //             rules = ruleString;
-//             //             //         }
-//             //             //         break;
+    for (let i = 0; i < voucherAmount.length; i++) {
+        if (voucherAmount[i].isFixDiscount) {
+            valueOfVoucherAmount.push(`      ${Struct}.Total = ${Struct}.Total - ${voucherAmount[i].discount};\n`);
+            if (whenStringRuleOfCurrency.length == 0) {
+                whenStringRuleOfCurrency += `      (${Struct}.Product == ${voucherAmount[i].selectProduct} && ${Struct}.Currency == "${voucherAmount[i].currency}")\n`;
+            } else {
+                whenStringRuleOfCurrency += `      || (${Struct}.Product == ${voucherAmount[i].selectProduct} && ${Struct}.Currency == "${voucherAmount[i].currency}")\n`;
+            }
+        } else {
+            valueOfVoucherAmount.push(`      ${Struct}.Total = ${Struct}.Total * ${1 - (voucherAmount[i].discount / 100)};\n`);
+        }
+    }
 
-//             //             //     case 'Source':
-//             //             //         const sourceConditions = conditions as SourceConditions;
-//             //             //         if (sourceConditions.channels) {
-//             //             //             let ruleString = `rule "${convertRuleString}" {\n`;
-//             //             //             ruleString += `    when\n      ${Struct}.Channel ${operator} (${sourceConditions.channels.map(channel => `"${channel}"`).join(', ')}) && ${Struct}.Currency == "${currency[i]}"\n`;
-//             //             //             ruleString += `    then\n      ${Struct}.Result = "Condition met";\n      ${Struct}.MintPoint = ${Struct}.Total / ${pointAmounts[i]};\n      ${Struct}.Voucher = ${isSelectVoucher};\n      Retract("${convertRuleString}");\n`;
-//             //             //             ruleString += `}`;
-//             //             //             rules = ruleString;
-//             //             //         }
-//             //             //         if (sourceConditions.storeId) {
-//             //             //             let ruleString = `rule "${convertRuleString}" {\n`;
-//             //             //             ruleString += `    when\n      ${Struct}.StoreId ${operator} "${sourceConditions.storeId}" && ${Struct}.Currency == "${currency[i]}"\n`;
-//             //             //             ruleString += `    then\n      ${Struct}.Result = "Condition met";\n      ${Struct}.MintPoint = ${Struct}.Total / ${pointAmounts[i]};\n      ${Struct}.Voucher = ${isSelectVoucher};\n      Retract("${convertRuleString}");\n`;
-//             //             //             ruleString += `}`;
-//             //             //             rules = ruleString;
-//             //             //         }
-//             //             //         break;
+    for (let i = 0; i < pointAmounts.length; i++) {
+        valueOfPointAmounts.push(`      ${Struct}.MintPoint = ${Struct}.Total / ${pointAmounts[i].value};\n`);
+        if (pointAmounts[i].selectProduct.length > 0) {
+            if (whenStringRuleOfCurrency.length == 0) {
+                whenStringRuleOfCurrency += `      (${Struct}.Product == ${pointAmounts[i].selectProduct} && ${Struct}.Currency == "${pointAmounts[i].currency}")\n`;
+            } else {
+                whenStringRuleOfCurrency += `      || (${Struct}.Product == ${pointAmounts[i].selectProduct} && ${Struct}.Currency == "${pointAmounts[i].currency}")\n`;
+            }
+        }
+    }
 
-//             //             //     case 'Action':
-//             //             //         const actionConditions = conditions as ActionConditions;
-//             //             //         if (actionConditions.eventId) {
-//             //             //             let ruleString = `rule "${convertRuleString}" {\n`;
-//             //             //             ruleString += `    when\n      ${Struct}.EventId ${operator} "${actionConditions.eventId}" && ${Struct}.Currency == "${currency[i]}"\n`;
-//             //             //             ruleString += `    then\n      ${Struct}.Result = "Condition met";\n      ${Struct}.MintPoint = ${Struct}.Total / ${pointAmounts[i]};\n      ${Struct}.Voucher = ${isSelectVoucher};\n      Retract("${convertRuleString}");\n`;
-//             //             //             ruleString += `}`;
-//             //             //             rules = ruleString;
-//             //             //         }
-//             //             //         if (actionConditions.referalCode) {
-//             //             //             let ruleString = `rule "${convertRuleString}" {\n`;
-//             //             //             ruleString += `    when\n      ${Struct}.ReferalCode ${operator} "${actionConditions.referalCode}" && ${Struct}.Currency == "${currency[i]}"\n`;
-//             //             //             ruleString += `    then\n      ${Struct}.Result = "Condition met";\n      ${Struct}.MintPoint = ${Struct}.Total / ${pointAmounts[i]};\n      ${Struct}.Voucher = ${isSelectVoucher};\n      Retract("${convertRuleString}");\n`;
-//             //             //             ruleString += `}`;
-//             //             //             rules = ruleString;
-//             //             //         }
-//             //             //         if (actionConditions.gameId) {
-//             //             //             let ruleString = `rule "${convertRuleString}" {\n`;
-//             //             //             ruleString += `    when\n      ${Struct}.GameId ${operator} "${actionConditions.gameId}" && ${Struct}.currency == "${currency[i]}"\n`;
-//             //             //             ruleString += `    then\n      ${Struct}.Result = "Condition met";\n      ${Struct}.MintPoint = ${Struct}.Total / ${pointAmounts[i]};\n      ${Struct}.Voucher = ${isSelectVoucher};\n      Retract("${convertRuleString}");\n`;
-//             //             //             ruleString += `}`;
-//             //             //             rules = ruleString;
-//             //             //         }
-//             //             //         if (actionConditions.missionId) {
-//             //             //             let ruleString = `rule "${convertRuleString}" {\n`;
-//             //             //             ruleString += `    when\n      ${Struct}.MissionId ${operator} "${actionConditions.missionId}" && ${Struct}.Currency == "${currency[i]}"\n`;
-//             //             //             ruleString += `    then\n      ${Struct}.Result = "Condition met";\n      ${Struct}.MintPoint = ${Struct}.Total / ${pointAmounts[i]};\n      ${Struct}.Voucher = ${isSelectVoucher};\n      Retract("${convertRuleString}");\n`;
-//             //             //             ruleString += `}`;
-//             //             //             rules = ruleString;
-//             //             //         }
-//             //             //         break;
-//         }
-//         if (rules.length > 0) {
-//             console.log(`${rules}`);
-//             const valueRuleAfterDecode: string = ruleEngineEncode(rules);
-//             listRules.push(valueRuleAfterDecode);
-//         }
-//     }
-//     return listRules;
-// }
+    // whenStringRuleOfCurrency += ";"
+    let rules: string = "";
+
+    switch (Struct) {
+        case 'Cart':
+            const cartConditions = conditions as CartConditions;
+            if (cartConditions.total) {
+                let ruleString = `rule "${Struct}" {\n`;
+                ruleString += `    when\n      ${Struct}.Total ${operator} ${cartConditions.total} &&\n${whenStringRuleOfCurrency}`;
+                ruleString += `    then\n${valueOfPointAmounts}${valueOfVoucherAmount}      Retract("${convertRuleString}");\n`;
+                ruleString += `}`;
+                rules = ruleString;
+            }
+        // }
+        // break;
+        //     if (rules.length > 0) {
+        //         console.log(`${rules}`);
+        //         const valueRuleAfterDecode: string = ruleEngineEncode(rules);
+        //         listRules.push(valueRuleAfterDecode);
+        //     }
+    }
+
+    console.log("---------", rules);
+    return listRules;
+}
 

@@ -1,10 +1,10 @@
-export enum ConditionType {
-    IS = '==',
-    IS_NOT = '!=',
-    EQUALS_OR_GREATER_THAN = '>=',
-    EQUALS_OR_LESS_THAN = '<=',
-    GREATER_THAN = '>',
-    LESS_THAN = '<'
+const ConditionType = {
+    IS: '==',
+    IS_NOT: '!=',
+    EQUALS_OR_GREATER_THAN: '>=',
+    EQUALS_OR_LESS_THAN: '<=',
+    GREATER_THAN: '>',
+    LESS_THAN: '<'
 };
 
 const CURRENCY_SYMBOLS = {
@@ -14,7 +14,7 @@ const CURRENCY_SYMBOLS = {
     THB: '฿'
 };
 
-export function decodeNewRules(encodedRules: string[]): any[] {
+function decodeNewRules(encodedRules) {
     const decodedRules = encodedRules.map((encodedRule) => {
         const ruleString = Buffer.from(encodedRule, 'base64').toString('utf-8');
 
@@ -26,12 +26,15 @@ export function decodeNewRules(encodedRules: string[]): any[] {
 
         // Match the operator (==, !=, >=, <=, >, <)
         const operatorMatch = ruleString.match(/(==|!=|>=|<=|>|<)/);
-        const operator = operatorMatch ? Object.keys(ConditionType).find(key => ConditionType[key as keyof typeof ConditionType] === operatorMatch[1]) : null;
+        const operator = operatorMatch ? Object.keys(ConditionType).find(key => ConditionType[key] === operatorMatch[1]) : null;
 
-        let operatorData: any = null;
+        let operatorData = [];
 
         // Match the currency (USD, VND, etc.)
         let valueCurrency = "";
+        let typeValue = "";
+        let pointValue = null;
+        let isAmount = true;
 
         // Special handling for date ranges and exact matches (e.g., Customer.RegisterDate, Cart.PlaceOrderDate, Customer.Birthday)
         if (valueField && (valueField.includes('RegisterDate') || valueField.includes('PlaceOrderDate') || valueField.includes('Birthday'))) {
@@ -43,21 +46,62 @@ export function decodeNewRules(encodedRules: string[]): any[] {
                 const exactDateMatch = ruleString.match(/(==)\s+(\d+)/);
                 operatorData = exactDateMatch ? exactDateMatch[2] : null;
             }
+            typeValue = "date";
         } else {
             // Normal operator data (single value, could be a number or a string)
             const operatorDataMatch = ruleString.match(/(==|!=|>=|<=|>|<)\s+("[^"]*"|\d+(\.\d+)?)/);
             operatorData = operatorDataMatch ? operatorDataMatch[2].replace(/"/g, '') : null; // Remove quotes if it's a string
             const valueCurrencyMatch = ruleString.match(/Currency\s*==\s*"(\w+)"/);
             if (valueField && valueCurrencyMatch && !valueField.includes('Birthday')) {
-                valueCurrency = CURRENCY_SYMBOLS[valueCurrencyMatch[1] as keyof typeof CURRENCY_SYMBOLS] || "";
+                valueCurrency = CURRENCY_SYMBOLS[valueCurrencyMatch[1]] || "";
+            }
+            if (
+                valueField && (valueField.includes('Amount') ||
+                    valueField.includes('Total'))
+            ) {
+                typeValue = "number";
+            } else {
+                typeValue = "string";
             }
         }
 
+        // Extract Voucher array if it exists
+        let selectID = [];
+        const voucherMatch = ruleString.match(/Voucher\s*=\s*\[([^\]]+)\];/);
+        if (voucherMatch) {
+            selectID = voucherMatch[1].split(',').map(v => v.trim().replace(/"/g, ''));
+        }
+
+        // Extract MintPoint and determine if it's an amount or a calculation
+        const mintPointMatch = ruleString.match(/MintPoint\s*=\s*(.*?);/);
+        if (mintPointMatch) {
+            const mintPointExpression = mintPointMatch[1].trim();
+            if (/[+\-*/]/.test(mintPointExpression)) {
+                isAmount = false;
+                // Extract the numeric value from the expression
+                const valueMatch = mintPointExpression.match(/\/\s*(\d+(\.\d+)?)/);
+                if (valueMatch) {
+                    pointValue = parseFloat(valueMatch[1]);
+                }
+            } else {
+                pointValue = parseFloat(mintPointExpression);
+            }
+        }
+
+        // Ensure valueField is not null before using includes
+        if (valueField && valueField.includes('Category')) {
+            valueCurrency = "";
+        }
+
         return {
-            ValueField: valueField,
+            valueField: valueField,
             operator: operator,
             operatorData: operatorData,
-            ValueCurrency: valueCurrency
+            valueCurrency: valueCurrency,
+            typeValue,
+            pointValue: pointValue,
+            isAmount: isAmount,
+            selectIdList: selectID
         };
     });
 
@@ -66,9 +110,9 @@ export function decodeNewRules(encodedRules: string[]): any[] {
     return decodedRules;
 }
 
-
-
-
-
-
-
+// Test case
+decodeNewRules(
+    [
+        "cnVsZSAiUnVsZV8xMCIgewogICAgICB3aGVuCiAgICAgICAgMSA9PSAxCiAgICAgIHRoZW4KICAgICAgICBDYXJ0LlJlc3VsdCA9ICJDb25kaXRpb24gbWV0IjsKICAgICAgICBDYXJ0Lk1pbnRQb2ludCA9IENhcnQuVG90YWwgLyAyOwogICAgICAgIENhcnQuVm91Y2hlciA9IFsiIl07CiAgICAgICAgUmV0cmFjdCgiUnVsZV8xMCIpOwogIH0="
+    ]
+);

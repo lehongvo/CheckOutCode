@@ -11,64 +11,63 @@ import {
     ActionConditions,
     genNewRules,
     Currency,
-    // genNewRulesRedeem,
+    genNewRulesRedeem,
     PointAmounts,
-    VoucherAmounts
+    VoucherAmounts,
 } from './interface';
-import { decodeNewRules } from './webDecode';
 
-export function createAndExecuteRule01(
-    nameRuleEngine: string,
-    structType: 'Cart' | 'Product' | 'Customer' | 'Source' | 'Action',
-    specificConditions: any,
-    pointAmounts: number[],
-    isSelectVoucherListParams: string[],
-    conditionType: ConditionType,
-    currency: Currency[]
-) {
-    let conditions: any;
+// export function createAndExecuteRule01(
+//     nameRuleEngine: string,
+//     structType: 'Cart' | 'Product' | 'Customer' | 'Source' | 'Action',
+//     specificConditions: any,
+//     pointAmounts: number[],
+//     isSelectVoucherListParams: string[],
+//     conditionType: ConditionType,
+//     currency: Currency[]
+// ) {
+//     let conditions: any;
 
-    switch (structType) {
-        case 'Cart':
-            conditions = specificConditions as CartConditions;
-            break;
-        case 'Product':
-            conditions = specificConditions as ProductConditions;
-            break;
-        case 'Customer':
-            conditions = specificConditions as CustomerConditions;
-            break;
-        case 'Source':
-            conditions = specificConditions as SourceConditions;
-            break;
-        case "Action":
-            conditions = specificConditions as ActionConditions;
-            break;
-    }
+//     switch (structType) {
+//         case 'Cart':
+//             conditions = specificConditions as CartConditions;
+//             break;
+//         case 'Product':
+//             conditions = specificConditions as ProductConditions;
+//             break;
+//         case 'Customer':
+//             conditions = specificConditions as CustomerConditions;
+//             break;
+//         case 'Source':
+//             conditions = specificConditions as SourceConditions;
+//             break;
+//         case "Action":
+//             conditions = specificConditions as ActionConditions;
+//             break;
+//     }
 
-    const rules = genNewRules(nameRuleEngine, structType, conditions, pointAmounts, isSelectVoucherListParams, conditionType, currency, 1724235564, 1725220170, 1724230974, 1724230974, ["123123", "23423d23"]);
-    console.log(`======================================${structType}======================================`);
-    return rules;
-}
+//     const rules = genNewRules(nameRuleEngine, structType, conditions, pointAmounts, isSelectVoucherListParams, conditionType, currency, 1724235564, 1725220170, 1724230974, 1724230974, ["123123", "23423d23"]);
+//     console.log(`======================================${structType}======================================`);
+//     return rules;
+// }
 
-const isSelectVoucherList: string[] = ["983h2d192837h328fo223f2", "9823h9283ỳ7238ỳh23f23i987"]
+// const isSelectVoucherList: string[] = ["983h2d192837h328fo223f2", "9823h9283ỳ7238ỳh23f23i987"]
 
 // Cart Examples
 
 // Example 1: Cart - Total >= <Number>
-const cartConditionsTotal: CartConditions = {
-    total: 500
-};
-const role = createAndExecuteRule01(
-    "Cart - Total",
-    'Cart',
-    cartConditionsTotal,
-    [1000],
-    isSelectVoucherList,
-    ConditionType.EQUALS_OR_GREATER_THAN,
-    [Currency.USD]
-);
-console.log(role);
+// const cartConditionsTotal: CartConditions = {
+//     total: 500
+// };
+// const role = createAndExecuteRule01(
+//     "Cart - Total",
+//     'Cart',
+//     cartConditionsTotal,
+//     [1000],
+//     isSelectVoucherList,
+//     ConditionType.EQUALS_OR_GREATER_THAN,
+//     [Currency.USD]
+// );
+// console.log(role);
 
 // Example 2: Cart - Amount >= <Number>
 // const cartConditionsAmount: CartConditions = {
@@ -210,83 +209,76 @@ console.log(role);
 //     ]
 // )
 
-// export function createAndExecuteRule(
-//     nameRuleEngine: string,
-//     structType: 'Cart' | 'Product' | 'Customer' | 'Source' | 'Action',
-//     specificConditions: any,
-//     isSelectVoucher: boolean,
-//     conditionType: ConditionType
-// ) {
-//     let conditions: any;
+export function createAndExecuteRule(
+    nameRuleEngine: string,
+    structType: 'Cart' | 'Product' | 'Customer' | 'Source' | 'Action',
+    specificConditions: any,
+    conditionType: ConditionType,
+) {
+    let conditions: any;
 
-//     switch (structType) {
-//         case 'Cart':
-//             conditions = specificConditions as CartConditions;
-//             break;
-//         case 'Product':
-//             conditions = specificConditions as ProductConditions;
-//             break;
-//         case 'Customer':
-//             conditions = specificConditions as CustomerConditions;
-//             break;
-//         case 'Source':
-//             conditions = specificConditions as SourceConditions;
-//             break;
-//         case "Action":
-//             conditions = specificConditions as ActionConditions;
-//             break;
-//     }
+    switch (structType) {
+        case 'Cart':
+            conditions = specificConditions as CartConditions;
+            break;
+        case 'Product':
+            conditions = specificConditions as ProductConditions;
+            break;
+        case 'Customer':
+            conditions = specificConditions as CustomerConditions;
+            break;
+        case 'Source':
+            conditions = specificConditions as SourceConditions;
+            break;
+        case "Action":
+            conditions = specificConditions as ActionConditions;
+            break;
+    }
 
-//     const value1: PointAmounts = {
-//         value: 123123,
-//         selectProduct: "Phone",
-//         currency: Currency.USD
-//     }
+    const value1: PointAmounts = {
+        value: 123123,
+        selectProduct: "Phone",
+        currency: Currency.USD
+    }
 
-//     const value2: VoucherAmounts = {
-//         discount: 30,
-//         selectProduct: "Table",
-//         isFixDiscount: true,
-//         currency: Currency.USD
-//     }
+    const value2: VoucherAmounts = {
+        discount: 30,
+        selectProduct: "Table",
+        isFixDiscount: true,
+        currency: Currency.THB
+    }
 
-//     const rules = genNewRulesRedeem(
-//         nameRuleEngine,
-//         structType,
-//         conditions,
-//         isSelectVoucher,
-//         conditionType,
-//         1724235564,
-//         1725220170,
-//         1724230974,
-//         1724230974,
-//         [
-//             value1
-//         ],
-//         [
-//             value2
-//         ]
-//     );
-//     console.log(rules);
-//     console.log(`======================================${structType}======================================`);
-//     return rules;
-// }
+    const rules = genNewRulesRedeem(
+        nameRuleEngine,
+        structType,
+        conditions,
+        conditionType,
+        1724235564,
+        1725220170,
+        1724230974,
+        1724230974,
+        [
+            value1,
+            value1,
+        ],
+        [
+            value2,
+            value2,
+            value2,
+        ]
+    );
+    console.log(rules);
+    console.log(`======================================${structType}======================================`);
+    return rules;
+}
 
 // Example 1: Cart - Total >= <Number>
-// const cartConditionsTotal: CartConditions = {
-//     total: 500
-// };
-// const role = createAndExecuteRule(
-//     "Cart - Total",
-//     'Cart',
-//     cartConditionsTotal,
-//     true,
-//     ConditionType.EQUALS_OR_GREATER_THAN,
-// );
-
-// decodeNewRules(
-//     [
-//         "cnVsZSAiUnVsZSAyIiB7CiAgICAgIHdoZW4KICAgICAgICAxNzI0NDMyNDAwIDw9IEN1c3RvbWVyLlJlZ2lzdGVyRGF0ZSAmJiAxNzI1MTIzNjAwID49IEN1c3RvbWVyLlJlZ2lzdGVyRGF0ZSAmJiBDdXN0b21lci5DdXJyZW5jeSA9PSAiVVNEIgogICAgICB0aGVuCiAgICAgICAgQ3VzdG9tZXIuUmVzdWx0ID0gIkNvbmRpdGlvbiBtZXQiOwogICAgICAgIEN1c3RvbWVyLk1pbnRQb2ludCA9IEN1c3RvbWVyLlRvdGFsIC8gMTsKICAgICAgICBDdXN0b21lci5Wb3VjaGVyID0gZmFsc2U7CiAgICAgICAgUmV0cmFjdCgiUnVsZSAyIik7CiAgfQ=="
-//     ]
-// )
-
+const cartConditionsTotal: CartConditions = {
+    total: 500
+};
+const role = createAndExecuteRule(
+    "Cart - Total",
+    'Cart',
+    cartConditionsTotal,
+    ConditionType.EQUALS_OR_GREATER_THAN,
+);

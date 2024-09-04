@@ -1,0 +1,18 @@
+{
+    "collection_id": "3b969316-5df3-420e-b78e-9992b19006f8",
+    "point_cart_total": {
+        "currency_id": "USD",
+        "value": "",
+        "discount_rate": "1"
+    },
+    "point_product_reward": {
+        "currency_id": "USD",
+        "product_name": {
+            "id": 1,
+            "value": "Mouse Logitech",
+            "label": "Mouse Logitech"
+        },
+        "discount_rate": "1",
+        "value": ""
+    }
+}
