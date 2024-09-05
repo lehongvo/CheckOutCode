@@ -101,31 +101,43 @@ func helperTransformRule(ruleString string) string {
 	var outputLines []string
 
 	for _, line := range lines {
-		if strings.Contains(line, "Item.MintPoint") {
+		trimmedLine := strings.TrimSpace(line)
+
+		if strings.Contains(trimmedLine, "Item.Voucher = []") {
 			continue
 		}
-		if strings.Contains(line, "Item.Voucher") {
-			startIdx := strings.Index(line, `{"collection_id":"`)
-			endIdx := strings.Index(line[startIdx:], `","`) + startIdx
-			if startIdx != -1 && endIdx != -1 {
-				collectionID := line[startIdx+18 : endIdx]
-				line = fmt.Sprintf("      Helper.AddVoucher(Item, \"%s\");", collectionID)
+
+		if strings.Contains(trimmedLine, "Item.Voucher") {
+			startIdx := strings.Index(trimmedLine, `{"collection_id":"`)
+			if startIdx != -1 {
+				endIdx := strings.Index(trimmedLine[startIdx:], `",`) + startIdx
+				if endIdx > startIdx {
+					collectionID := trimmedLine[startIdx+18 : endIdx]
+					line = fmt.Sprintf("      Helper.AddVoucher(Item, \"%s\");", collectionID)
+				} else {
+					continue
+				}
+			} else {
+				continue
 			}
 		}
+
 		outputLines = append(outputLines, line)
 	}
 
-	// Ghép lại các dòng thành một chuỗi mới
 	return strings.Join(outputLines, "\n")
 }
 
 func applyRules(item *Item, encodedRuleValue string, ruleName string, version string) error {
 	ruleString, err := ruleEngineDecode(encodedRuleValue)
+
 	if err != nil {
 		return fmt.Errorf("Error decoding rule: %v", err)
 	}
 
 	updatedRuleStringWithVoucherData := updateRuleString(ruleString)
+
+	fmt.Printf("123%s\n", updatedRuleStringWithVoucherData)
 
 	updatedRuleString := helperTransformRule(updatedRuleStringWithVoucherData)
 
@@ -189,9 +201,10 @@ func main() {
 		Channels:       []Channel{Online, Offline},
 		Currency:       "USD",
 		DebugLog:       "",
+		Voucher:        []string{},
 	}
 
-	encodedRuleValue := `cnVsZSAiQ3JlYXRlX25ld19SZWRlbXB0aW9uX1J1bGVfNyIgewogICAgICB3aGVuCiAgICAgICAgQ2FydC5Ub3RhbCBub3QgaW4gMzAwCiAgICAgIHRoZW4KICAgICAgICBDYXJ0LlJlc3VsdCA9ICJDb25kaXRpb24gbWV0IjsKICAgICAgICBDYXJ0Lk1pbnRQb2ludCA9IFt7InBvaW50X2NhcnRfdG90YWwiOnsiY3VycmVuY3lfaWQiOiJVU0QiLCJwb2ludF9hbW91bnQiOiIiLCJ2YWx1ZSI6IiIsImFtb3VudF92YWx1ZSI6IiJ9LCJwb2ludF9wcm9kdWN0X3Jld2FyZCI6eyJjdXJyZW5jeV9pZCI6IlVTRCIsInByb2R1Y3RfbmFtZSI6MSwicG9pbnRfYW1vdW50IjoiIiwidmFsdWUiOiIiLCJhbW91bnRfdmFsdWUiOiIifX1dOwogICAgICAgIENhcnQuVm91Y2hlciA9IFt7ImNvbGxlY3Rpb25faWQiOiJlM2U5NDg1ZS0yMDU1LTQ0M2EtOGQ0OC0xYzZkNWVjN2YxODkiLCJwb2ludF9jYXJ0X3RvdGFsIjp7ImN1cnJlbmN5X2lkIjoiVVNEIiwidmFsdWUiOiIiLCJkaXNjb3VudF9yYXRlIjoiMTAifSwicG9pbnRfcHJvZHVjdF9yZXdhcmQiOnsiY3VycmVuY3lfaWQiOiJVU0QiLCJwcm9kdWN0X25hbWUiOnsiaWQiOjEsInZhbHVlIjoiTW91c2UgTG9naXRlY2giLCJsYWJlbCI6Ik1vdXNlIExvZ2l0ZWNoIn0sImRpc2NvdW50X3JhdGUiOiIiLCJ2YWx1ZSI6IjEwMCJ9fV07CiAgICAgICAgUmV0cmFjdCgiQ3JlYXRlX25ld19SZWRlbXB0aW9uX1J1bGVfNyIpOwogIH0=`
+	encodedRuleValue := `cnVsZSAiVGVzdF9SZXdhcmRfUG9pbnRfVm91Y2hlciIgewogICAgICB3aGVuCiAgICAgICAgQ2FydC5Ub3RhbCA+PSAyMDAgJiYgQ2FydC5DdXJyZW5jeSA9PSAiVVNEIgogICAgICB0aGVuCiAgICAgICAgQ2FydC5SZXN1bHQgPSAiQ29uZGl0aW9uIG1ldCI7CiAgICAgICAgQ2FydC5NaW50UG9pbnQgPSBDYXJ0LlRvdGFsIC8gMTAwOwogICAgICAgIENhcnQuVm91Y2hlciA9IFsiZTNlOTQ4NWUtMjA1NS00NDNhLThkNDgtMWM2ZDVlYzdmMTg5Il07CiAgICAgICAgUmV0cmFjdCgiVGVzdF9SZXdhcmRfUG9pbnRfVm91Y2hlciIpOwogIH0=`
 
 	err := applyRules(item, encodedRuleValue, "CartAmount", "0.1.0")
 	if err != nil {
