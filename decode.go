@@ -95,31 +95,41 @@ func helperTransformRule(ruleString string) string {
 	lines := strings.Split(ruleString, "\n")
 	var outputLines []string
 	var collectionIDs []string
-	collectingVouchers := false
+	skipBlock := false
 
 	for _, line := range lines {
 		trimmedLine := strings.TrimSpace(line)
 
-		if strings.Contains(trimmedLine, "Cart.RedempVoucher = [") {
-			collectingVouchers = true
+		// Detect start of the RedempPoint block and skip it
+		if strings.Contains(trimmedLine, "Cart.RedempPoint = [") {
+			skipBlock = true
 		}
-
-		if collectingVouchers {
-			if strings.Contains(trimmedLine, "Cart.CollectionId:") {
-				id := strings.TrimSpace(strings.Split(trimmedLine, ":")[1])
-				id = strings.Trim(id, `"`) // Remove the quotes around the ID
-				collectionIDs = append(collectionIDs, id)
-			}
-
+		if skipBlock {
 			if strings.Contains(trimmedLine, "];") {
-				collectingVouchers = false // Stop collecting when we reach the end of the array
-				// Insert the helper function call with collected IDs after transformation is done
-				outputLines = append(outputLines, fmt.Sprintf("        Helper.AddVoucher(Item, %s)", strings.Join(collectionIDs, ", ")))
-				continue
+				skipBlock = false
 			}
-		} else {
-			outputLines = append(outputLines, line)
+			continue // Skip the entire RedempPoint block
 		}
+
+		// Handle the Cart.RedempVoucher block
+		if strings.Contains(trimmedLine, "Cart.RedempVoucher = [") {
+			collectionIDs = []string{} // Reset for safety
+			continue
+		} else if strings.Contains(trimmedLine, "Cart.CollectionId:") {
+			id := strings.Split(trimmedLine, ":")[1]
+			id = strings.Trim(id, " ,\"")
+			collectionIDs = append(collectionIDs, id)
+			continue
+		} else if strings.Contains(trimmedLine, "];") {
+			if len(collectionIDs) > 0 {
+				// Append the Helper.AddVoucher call after collecting all IDs
+				outputLines = append(outputLines, fmt.Sprintf("        Helper.AddVoucher(Item, \"%s\")", strings.Join(collectionIDs, "\", \"")))
+			}
+			continue
+		}
+
+		// Append lines that are outside any specific blocks
+		outputLines = append(outputLines, line)
 	}
 
 	return strings.Join(outputLines, "\n")

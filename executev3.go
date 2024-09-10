@@ -5,6 +5,11 @@ import (
 	"fmt"
 	"log"
 	"strings"
+
+	"github.com/hyperjumptech/grule-rule-engine/ast"
+	"github.com/hyperjumptech/grule-rule-engine/builder"
+	"github.com/hyperjumptech/grule-rule-engine/engine"
+	"github.com/hyperjumptech/grule-rule-engine/pkg"
 )
 
 // Enum for Channel
@@ -61,9 +66,8 @@ type Item struct {
 	MintPoint int
 	Voucher   []string
 
-	Currency  string
-	DebugLog  string
-	IsProduct bool
+	Currency string
+	DebugLog string
 }
 
 // Tạo RuleHelper với hàm AddVoucher
@@ -97,79 +101,69 @@ func helperTransformRule(ruleString string) string {
 	var outputLines []string
 
 	for _, line := range lines {
-		trimmedLine := strings.TrimSpace(line)
-
-		if strings.Contains(trimmedLine, "Item.Voucher = []") {
+		if strings.Contains(line, "Item.MintPoint") {
 			continue
 		}
-
-		if strings.Contains(trimmedLine, "Item.Voucher") {
-			startIdx := strings.Index(trimmedLine, "[\"")
-			endIdx := strings.LastIndex(trimmedLine, "\"]")
-			if startIdx != -1 && endIdx != -1 && endIdx > startIdx {
-				voucherValue := trimmedLine[startIdx+2 : endIdx]
-				line = fmt.Sprintf("      Helper.AddVoucher(Item, \"%s\");", voucherValue)
-			} else {
-				continue
+		if strings.Contains(line, "Item.Voucher") {
+			startIdx := strings.Index(line, `{"collection_id":"`)
+			endIdx := strings.Index(line[startIdx:], `","`) + startIdx
+			if startIdx != -1 && endIdx != -1 {
+				collectionID := line[startIdx+18 : endIdx]
+				line = fmt.Sprintf("      Helper.AddVoucher(Item, \"%s\");", collectionID)
 			}
 		}
-
 		outputLines = append(outputLines, line)
 	}
 
+	// Ghép lại các dòng thành một chuỗi mới
 	return strings.Join(outputLines, "\n")
 }
 
 func applyRules(item *Item, encodedRuleValue string, ruleName string, version string) error {
 	ruleString, err := ruleEngineDecode(encodedRuleValue)
+	if err != nil {
+		return fmt.Errorf("Error decoding rule: %v", err)
+	}
 
-	fmt.Printf("123%s\n", ruleString)
+	updatedRuleStringWithVoucherData := updateRuleString(ruleString)
 
-	// if err != nil {
-	// 	return fmt.Errorf("Error decoding rule: %v", err)
-	// }
+	updatedRuleString := helperTransformRule(updatedRuleStringWithVoucherData)
 
-	// updatedRuleStringWithVoucherData := updateRuleString(ruleString)
+	fmt.Printf("123%s\n", updatedRuleString)
 
-	// fmt.Printf("123%s\n", updatedRuleStringWithVoucherData)
+	dataContext := ast.NewDataContext()
+	err = dataContext.Add("Item", item)
+	if err != nil {
+		return err
+	}
 
-	// updatedRuleString := helperTransformRule(updatedRuleStringWithVoucherData)
+	ruleHelper := &RuleHelper{}
+	err = dataContext.Add("Helper", ruleHelper)
+	if err != nil {
+		return err
+	}
 
-	// fmt.Printf("123%s\n", updatedRuleString)
+	kb := ast.NewKnowledgeLibrary()
+	ruleBuilder := builder.NewRuleBuilder(kb)
 
-	// dataContext := ast.NewDataContext()
-	// err = dataContext.Add("Item", item)
-	// if err != nil {
-	// 	return err
-	// }
+	resource := pkg.NewBytesResource([]byte(updatedRuleString))
+	err = ruleBuilder.BuildRuleFromResource(ruleName, version, resource)
+	if err != nil {
+		return fmt.Errorf("failed to build rule '%s': %v", ruleName, err)
+	}
 
-	// ruleHelper := &RuleHelper{}
-	// err = dataContext.Add("Helper", ruleHelper)
-	// if err != nil {
-	// 	return err
-	// }
+	knowledgeBase, err := kb.NewKnowledgeBaseInstance(ruleName, version)
+	if err != nil {
+		return fmt.Errorf("failed to create knowledge base for rule '%s': %v", ruleName, err)
+	}
 
-	// kb := ast.NewKnowledgeLibrary()
-	// ruleBuilder := builder.NewRuleBuilder(kb)
+	eng := engine.NewGruleEngine()
+	eng.MaxCycle = 1000
 
-	// resource := pkg.NewBytesResource([]byte(updatedRuleString))
-	// err = ruleBuilder.BuildRuleFromResource(ruleName, version, resource)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to build rule '%s': %v", ruleName, err)
-	// }
-
-	// knowledgeBase, err := kb.NewKnowledgeBaseInstance(ruleName, version)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to create knowledge base for rule '%s': %v", ruleName, err)
-	// }
-
-	// eng := engine.NewGruleEngine()
-	// eng.MaxCycle = 1000
-
-	// err = eng.Execute(dataContext, knowledgeBase)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to execute rule engine for rule '%s': %v", ruleName, err)
-	// }
+	err = eng.Execute(dataContext, knowledgeBase)
+	if err != nil {
+		return fmt.Errorf("failed to execute rule engine for rule '%s': %v", ruleName, err)
+	}
 
 	return nil
 }
@@ -195,10 +189,9 @@ func main() {
 		Channels:       []Channel{Online, Offline},
 		Currency:       "USD",
 		DebugLog:       "",
-		Voucher:        []string{},
 	}
 
-	encodedRuleValue := `cnVsZSAiVGVzdF9SZXdhcmRfUG9pbnRfVm91Y2hlciIgewogICAgICB3aGVuCiAgICAgICAgQ2FydC5Ub3RhbCA+PSAyMDAgJiYgQ2FydC5DdXJyZW5jeSA9PSAiVVNEIgogICAgICB0aGVuCiAgICAgICAgQ2FydC5SZXN1bHQgPSAiQ29uZGl0aW9uIG1ldCI7CiAgICAgICAgQ2FydC5NaW50UG9pbnQgPSBDYXJ0LlRvdGFsIC8gMTAwOwogICAgICAgIENhcnQuVm91Y2hlciA9IFsiZTNlOTQ4NWUtMjA1NS00NDNhLThkNDgtMWM2ZDVlYzdmMTg5Il07CiAgICAgICAgUmV0cmFjdCgiVGVzdF9SZXdhcmRfUG9pbnRfVm91Y2hlciIpOwogIH0=`
+	encodedRuleValue := `cnVsZSAiZGFzZHNhZCIgewogICAgd2hlbgogICAgICAxID09IDEKICAgIHRoZW4KICAgICAgQ2FydC5SZXN1bHQgPSAiQ29uZGl0aW9uIG1ldCI7CiAgICAgIENhcnQuTWludFBvaW50ID0gW3sicG9pbnRfY2FydF90b3RhbCI6eyJjdXJyZW5jeV9pZCI6MCwicG9pbnRfYW1vdW50IjoiIiwidmFsdWUiOiIiLCJhbW91bnRfdmFsdWUiOiIifSwicG9pbnRfcHJvZHVjdF9yZXdhcmQiOnsiY3VycmVuY3lfaWQiOjAsInByb2R1Y3RfbmFtZSI6IiIsInBvaW50X2Ftb3VudCI6IiIsInZhbHVlIjoiIiwiYW1vdW50X3ZhbHVlIjoiIn19XTsKICAgICAgQ2FydC5Wb3VjaGVyID0gW3siY29sbGVjdGlvbl9pZCI6IjNiOTY5MzE2LTVkZjMtNDIwZS1iNzhlLTk5OTJiMTkwMDZmOCIsInBvaW50X2NhcnRfdG90YWwiOnsiY3VycmVuY3lfaWQiOiJVU0QiLCJ2YWx1ZSI6IiIsImRpc2NvdW50X3JhdGUiOiIxIn0sInBvaW50X3Byb2R1Y3RfcmV3YXJkIjp7ImN1cnJlbmN5X2lkIjoiVVNEIiwicHJvZHVjdF9uYW1lIjp7ImlkIjoxLCJ2YWx1ZSI6Ik1vdXNlIExvZ2l0ZWNoIiwibGFiZWwiOiJNb3VzZSBMb2dpdGVjaCJ9LCJkaXNjb3VudF9yYXRlIjoiMSIsInZhbHVlIjoiIn19XTsKICAgICAgUmV0cmFjdCgiZGFzZHNhZCIpOwp9`
 
 	err := applyRules(item, encodedRuleValue, "CartAmount", "0.1.0")
 	if err != nil {

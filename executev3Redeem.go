@@ -5,6 +5,11 @@ import (
 	"fmt"
 	"log"
 	"strings"
+
+	"github.com/hyperjumptech/grule-rule-engine/ast"
+	"github.com/hyperjumptech/grule-rule-engine/builder"
+	"github.com/hyperjumptech/grule-rule-engine/engine"
+	"github.com/hyperjumptech/grule-rule-engine/pkg"
 )
 
 // Enum for Channel
@@ -95,34 +100,42 @@ func helperTransformRule(ruleString string) string {
 	lines := strings.Split(ruleString, "\n")
 	var outputLines []string
 	var collectionIDs []string
-	collectingVouchers := false
+	skipBlock := false
 
 	for _, line := range lines {
 		trimmedLine := strings.TrimSpace(line)
 
-		if strings.Contains(trimmedLine, "Cart.RedempVoucher = [") {
-			collectingVouchers = true
-			continue // Start collecting and skip this line
+		// Detect start of any unwanted blocks to skip
+		if strings.Contains(trimmedLine, "Cart.RedempPoint = [") || strings.Contains(trimmedLine, "Cart.RedempVoucher = [") {
+			skipBlock = true
 		}
 
-		if collectingVouchers {
+		if skipBlock {
+			if strings.Contains(trimmedLine, "];") {
+				skipBlock = false
+			}
+			// Collect collection IDs within unwanted blocks for Vouchers, just in case
 			if strings.Contains(trimmedLine, "Cart.CollectionId:") {
-				// Extract the ID value
 				parts := strings.Split(trimmedLine, ":")
 				if len(parts) > 1 {
 					id := strings.Trim(parts[1], " ,\"")
 					collectionIDs = append(collectionIDs, id)
 				}
 			}
-
-			if strings.Contains(trimmedLine, "];") {
-				collectingVouchers = false // Stop collecting
-				// Add a line to call Helper.AddVoucher with the collected IDs
-				outputLines = append(outputLines, fmt.Sprintf("        Helper.AddVoucher(Item, \"%s\")", strings.Join(collectionIDs, "\", \"")))
-				continue
-			}
 		} else {
-			outputLines = append(outputLines, line) // Add non-voucher lines as is
+			outputLines = append(outputLines, line) // Add the lines that are outside of skip blocks
+		}
+	}
+
+	// If collection IDs were found, add the Helper.AddVoucher call within the 'then' block correctly
+	if len(collectionIDs) > 0 {
+		for i, line := range outputLines {
+			if strings.Contains(line, "then") {
+				// Insert the Helper.AddVoucher call after the 'then' line
+				voucherLine := fmt.Sprintf("        Helper.AddVoucher(Item, \"%s\")", strings.Join(collectionIDs, "\", \""))
+				outputLines = append(outputLines[:i+1], append([]string{voucherLine}, outputLines[i+1:]...)...)
+				break
+			}
 		}
 	}
 
@@ -135,19 +148,60 @@ func applyRules(item *Item, encodedRuleValue string, ruleName string, version st
 		return fmt.Errorf("Error decoding rule: %v", err)
 	}
 
-	// Transform the rule string to remove the RedempPoint section
-	transformedRuleString := helperTransformRule(ruleString)
-
+	transformedRuleStringNotEncodeYet := helperTransformRule(ruleString)
+	transformedRuleString := updateRuleString(transformedRuleStringNotEncodeYet)
 	fmt.Printf("Transformed rule: \n%s\n", transformedRuleString)
 
-	// Further rule processing can be added here
+	dataContext := ast.NewDataContext()
+	err = dataContext.Add("Item", item)
+	if err != nil {
+		return err
+	}
+
+	ruleHelper := &RuleHelper{}
+	err = dataContext.Add("Helper", ruleHelper)
+	if err != nil {
+		return err
+	}
+
+	kb := ast.NewKnowledgeLibrary()
+	ruleBuilder := builder.NewRuleBuilder(kb)
+
+	resource := pkg.NewBytesResource([]byte(transformedRuleString))
+	err = ruleBuilder.BuildRuleFromResource(ruleName, version, resource)
+	if err != nil {
+		return fmt.Errorf("failed to build rule '%s': %v", ruleName, err)
+	}
+
+	knowledgeBase, err := kb.NewKnowledgeBaseInstance(ruleName, version)
+	if err != nil {
+		return fmt.Errorf("failed to create knowledge base for rule '%s': %v", ruleName, err)
+	}
+
+	eng := engine.NewGruleEngine()
+	eng.MaxCycle = 1000
+
+	err = eng.Execute(dataContext, knowledgeBase)
+	if err != nil {
+		return fmt.Errorf("failed to execute rule engine for rule '%s': %v", ruleName, err)
+	}
 
 	return nil
 }
 
+func updateRuleString(ruleString string) string {
+	objectsToReplace := []string{"Cart", "Product", "Customer", "Source", "Action"}
+
+	for _, obj := range objectsToReplace {
+		ruleString = strings.ReplaceAll(ruleString, obj+".", "Item.")
+	}
+
+	return ruleString
+}
+
 func main() {
 	item := &Item{
-		Total:          10000000,
+		Total:          1,
 		Amount:         9000000,
 		PlaceOrderDate: 1724235564,
 		SKU:            "SKU1",
