@@ -5,11 +5,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-
-	"github.com/hyperjumptech/grule-rule-engine/ast"
-	"github.com/hyperjumptech/grule-rule-engine/builder"
-	"github.com/hyperjumptech/grule-rule-engine/engine"
-	"github.com/hyperjumptech/grule-rule-engine/pkg"
 )
 
 // Enum for Channel
@@ -66,8 +61,9 @@ type Item struct {
 	MintPoint int
 	Voucher   []string
 
-	Currency string
-	DebugLog string
+	Currency  string
+	DebugLog  string
+	IsProduct bool
 }
 
 // Tạo RuleHelper với hàm AddVoucher
@@ -108,15 +104,11 @@ func helperTransformRule(ruleString string) string {
 		}
 
 		if strings.Contains(trimmedLine, "Item.Voucher") {
-			startIdx := strings.Index(trimmedLine, `{"collection_id":"`)
-			if startIdx != -1 {
-				endIdx := strings.Index(trimmedLine[startIdx:], `",`) + startIdx
-				if endIdx > startIdx {
-					collectionID := trimmedLine[startIdx+18 : endIdx]
-					line = fmt.Sprintf("      Helper.AddVoucher(Item, \"%s\");", collectionID)
-				} else {
-					continue
-				}
+			startIdx := strings.Index(trimmedLine, "[\"")
+			endIdx := strings.LastIndex(trimmedLine, "\"]")
+			if startIdx != -1 && endIdx != -1 && endIdx > startIdx {
+				voucherValue := trimmedLine[startIdx+2 : endIdx]
+				line = fmt.Sprintf("      Helper.AddVoucher(Item, \"%s\");", voucherValue)
 			} else {
 				continue
 			}
@@ -131,51 +123,53 @@ func helperTransformRule(ruleString string) string {
 func applyRules(item *Item, encodedRuleValue string, ruleName string, version string) error {
 	ruleString, err := ruleEngineDecode(encodedRuleValue)
 
-	if err != nil {
-		return fmt.Errorf("Error decoding rule: %v", err)
-	}
+	fmt.Printf("123%s\n", ruleString)
 
-	updatedRuleStringWithVoucherData := updateRuleString(ruleString)
+	// if err != nil {
+	// 	return fmt.Errorf("Error decoding rule: %v", err)
+	// }
 
-	fmt.Printf("123%s\n", updatedRuleStringWithVoucherData)
+	// updatedRuleStringWithVoucherData := updateRuleString(ruleString)
 
-	updatedRuleString := helperTransformRule(updatedRuleStringWithVoucherData)
+	// fmt.Printf("123%s\n", updatedRuleStringWithVoucherData)
 
-	fmt.Printf("123%s\n", updatedRuleString)
+	// updatedRuleString := helperTransformRule(updatedRuleStringWithVoucherData)
 
-	dataContext := ast.NewDataContext()
-	err = dataContext.Add("Item", item)
-	if err != nil {
-		return err
-	}
+	// fmt.Printf("123%s\n", updatedRuleString)
 
-	ruleHelper := &RuleHelper{}
-	err = dataContext.Add("Helper", ruleHelper)
-	if err != nil {
-		return err
-	}
+	// dataContext := ast.NewDataContext()
+	// err = dataContext.Add("Item", item)
+	// if err != nil {
+	// 	return err
+	// }
 
-	kb := ast.NewKnowledgeLibrary()
-	ruleBuilder := builder.NewRuleBuilder(kb)
+	// ruleHelper := &RuleHelper{}
+	// err = dataContext.Add("Helper", ruleHelper)
+	// if err != nil {
+	// 	return err
+	// }
 
-	resource := pkg.NewBytesResource([]byte(updatedRuleString))
-	err = ruleBuilder.BuildRuleFromResource(ruleName, version, resource)
-	if err != nil {
-		return fmt.Errorf("failed to build rule '%s': %v", ruleName, err)
-	}
+	// kb := ast.NewKnowledgeLibrary()
+	// ruleBuilder := builder.NewRuleBuilder(kb)
 
-	knowledgeBase, err := kb.NewKnowledgeBaseInstance(ruleName, version)
-	if err != nil {
-		return fmt.Errorf("failed to create knowledge base for rule '%s': %v", ruleName, err)
-	}
+	// resource := pkg.NewBytesResource([]byte(updatedRuleString))
+	// err = ruleBuilder.BuildRuleFromResource(ruleName, version, resource)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to build rule '%s': %v", ruleName, err)
+	// }
 
-	eng := engine.NewGruleEngine()
-	eng.MaxCycle = 1000
+	// knowledgeBase, err := kb.NewKnowledgeBaseInstance(ruleName, version)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to create knowledge base for rule '%s': %v", ruleName, err)
+	// }
 
-	err = eng.Execute(dataContext, knowledgeBase)
-	if err != nil {
-		return fmt.Errorf("failed to execute rule engine for rule '%s': %v", ruleName, err)
-	}
+	// eng := engine.NewGruleEngine()
+	// eng.MaxCycle = 1000
+
+	// err = eng.Execute(dataContext, knowledgeBase)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to execute rule engine for rule '%s': %v", ruleName, err)
+	// }
 
 	return nil
 }

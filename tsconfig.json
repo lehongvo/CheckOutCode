@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "module": "ESNext", // Use ESNext or ES6 for module syntax
+    "target": "ES6", // Target ES6 or later
+    "moduleResolution": "node",
+    "esModuleInterop": true, // This allows compatibility with CommonJS
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  }
+}

@@ -93,40 +93,30 @@ func ruleEngineDecode(encodedRuleText string) (string, error) {
 	decodedString = strings.Replace(decodedString, `rule "`, `rule `, 1)
 	decodedString = strings.Replace(decodedString, `" {`, ` {`, 1)
 
-	fmt.Printf("Encoded rule text: %s\n", decodedString)
-
 	return decodedString, nil
 }
 
 func helperTransformRule(ruleString string) string {
-	// Thay đổi tên rule và giá trị của Item.Currency
-	ruleString = strings.Replace(ruleString, "rule Get_point_and_voucher", "rule Reward_Point_and_Voucher", 1)
-	ruleString = strings.Replace(ruleString, `Item.Currency == "undefined"`, `Item.Currency == "USD"`, 1)
-
-	// Tìm dòng Item.Voucher và chuyển đổi thành Helper.AddVoucher
 	lines := strings.Split(ruleString, "\n")
-	for i, line := range lines {
+	var outputLines []string
+
+	for _, line := range lines {
+		if strings.Contains(line, "Item.MintPoint") {
+			continue
+		}
 		if strings.Contains(line, "Item.Voucher") {
-			// Tìm giá trị trong dấu ngoặc vuông
-			startIdx := strings.Index(line, `["`)
-			endIdx := strings.Index(line, `"]`)
+			startIdx := strings.Index(line, `{"collection_id":"`)
+			endIdx := strings.Index(line[startIdx:], `","`) + startIdx
 			if startIdx != -1 && endIdx != -1 {
-				voucherValue := line[startIdx+2 : endIdx]
-				// Thay thế dòng Item.Voucher bằng Helper.AddVoucher
-				lines[i] = fmt.Sprintf(`        Helper.AddVoucher(Item, "%s");`, voucherValue)
+				collectionID := line[startIdx+18 : endIdx]
+				line = fmt.Sprintf("      Helper.AddVoucher(Item, \"%s\");", collectionID)
 			}
 		}
+		outputLines = append(outputLines, line)
 	}
 
-	// Thay đổi dòng Retract
-	for i, line := range lines {
-		if strings.Contains(line, `Retract("Get_point_and_voucher");`) {
-			lines[i] = `        Retract("Reward_Point_and_Voucher");`
-		}
-	}
-
-	// Ghép lại thành rule string mới
-	return strings.Join(lines, "\n")
+	// Ghép lại các dòng thành một chuỗi mới
+	return strings.Join(outputLines, "\n")
 }
 
 func applyRules(item *Item, encodedRuleValue string, ruleName string, version string) error {
@@ -135,11 +125,11 @@ func applyRules(item *Item, encodedRuleValue string, ruleName string, version st
 		return fmt.Errorf("Error decoding rule: %v", err)
 	}
 
-	fmt.Printf("Rule string after update 01: %s\n", ruleString)
-
 	updatedRuleStringWithVoucherData := updateRuleString(ruleString)
 
 	updatedRuleString := helperTransformRule(updatedRuleStringWithVoucherData)
+
+	fmt.Printf("123%s\n", updatedRuleString)
 
 	dataContext := ast.NewDataContext()
 	err = dataContext.Add("Item", item)
@@ -199,10 +189,9 @@ func main() {
 		Channels:       []Channel{Online, Offline},
 		Currency:       "USD",
 		DebugLog:       "",
-		Voucher:        []string{},
 	}
 
-	encodedRuleValue := `cnVsZSBOZXdfUG9pbnRfVm91Y2hlciB7CndoZW4KICAgIENhcnQuVG90YWwgPj0gMjAwICYmIENhcnQuQ3VycmVuY3kgPT0gIlVTRCIKdGhlbgogICAgQ2FydC5SZXN1bHQgPSAiQ29uZGl0aW9uIG1ldCI7CiAgICBDYXJ0Lk1pbnRQb2ludCA9IENhcnQuVG90YWwgLyAxMDA7CiAgICBDYXJ0LlZvdWNoZXIgPSBbImUzZTk0ODVlLTIwNTUtNDQzYS04ZDQ4LTFjNmQ1ZWM3ZjE4OSJdOwogICAgUmV0cmFjdCgiTmV3Xy1fUG9pbnRfJl9Wb3VjaGVyIik7Cn0=`
+	encodedRuleValue := `cnVsZSAiZGFzZHNhZCIgewogICAgd2hlbgogICAgICAxID09IDEKICAgIHRoZW4KICAgICAgQ2FydC5SZXN1bHQgPSAiQ29uZGl0aW9uIG1ldCI7CiAgICAgIENhcnQuTWludFBvaW50ID0gW3sicG9pbnRfY2FydF90b3RhbCI6eyJjdXJyZW5jeV9pZCI6MCwicG9pbnRfYW1vdW50IjoiIiwidmFsdWUiOiIiLCJhbW91bnRfdmFsdWUiOiIifSwicG9pbnRfcHJvZHVjdF9yZXdhcmQiOnsiY3VycmVuY3lfaWQiOjAsInByb2R1Y3RfbmFtZSI6IiIsInBvaW50X2Ftb3VudCI6IiIsInZhbHVlIjoiIiwiYW1vdW50X3ZhbHVlIjoiIn19XTsKICAgICAgQ2FydC5Wb3VjaGVyID0gW3siY29sbGVjdGlvbl9pZCI6IjNiOTY5MzE2LTVkZjMtNDIwZS1iNzhlLTk5OTJiMTkwMDZmOCIsInBvaW50X2NhcnRfdG90YWwiOnsiY3VycmVuY3lfaWQiOiJVU0QiLCJ2YWx1ZSI6IiIsImRpc2NvdW50X3JhdGUiOiIxIn0sInBvaW50X3Byb2R1Y3RfcmV3YXJkIjp7ImN1cnJlbmN5X2lkIjoiVVNEIiwicHJvZHVjdF9uYW1lIjp7ImlkIjoxLCJ2YWx1ZSI6Ik1vdXNlIExvZ2l0ZWNoIiwibGFiZWwiOiJNb3VzZSBMb2dpdGVjaCJ9LCJkaXNjb3VudF9yYXRlIjoiMSIsInZhbHVlIjoiIn19XTsKICAgICAgUmV0cmFjdCgiZGFzZHNhZCIpOwp9`
 
 	err := applyRules(item, encodedRuleValue, "CartAmount", "0.1.0")
 	if err != nil {
