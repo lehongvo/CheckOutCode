@@ -406,3 +406,18 @@ export function genNewRulesRedeem(
     return listRules;
 }
 
+
+
+when SpecifixProd = false & Cart.Currency = "USD"
+then
+Voucher.CollectionId = "0xABC"
+Voucher.PercentDiscount = { percent_discount }
+Voucher.FixedAmountDiscount = { fixed_amount }
+Voucher.MetCondition = true
+    
+when SpecifixProd = true & Cart.Currency = "USD"
+then
+Voucher.CollectionId = "0xABC"
+Voucher.PercentDiscount = { percent_discount }
+Voucher.FixedAmountDiscount = { fixed_amount } // luôn luôn convert sang giá trị này khi người dùng nhập vào
+Voucher.MetCondition = true

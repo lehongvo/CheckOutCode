@@ -1,59 +1,42 @@
-const express = require('express');
-const { Engine } = require('json-rules-engine');
-const bodyParser = require('body-parser');
+Rule 2:
+Conditions:
+If ALL of these conditions are TRUE
+   Card Total greater than 100$
+   Product Category is New Collection
+   Customer CLV greater than 2000$
+   Channels is Offline
+   Source is London1
+Note: Tách Rule 2 thành 2 rule
 
-const app = express();
-app.use(bodyParser.json());
+rule Ruleư "Rule 2" {
+    when
+        (Item.Total >= 100 &&
+            Item.CLV > 2000 &&
+            Item.Channels[0] == 1 &&
+            Item.Source == "London1" &&
+            Item.Currency == "USD") == true
+    then
+    Item.RedempPoints[0].BasedPoint = 10;
+    Item.RedempPoints[0].ConvertedDiscount = 5;
+    Item.RedempPoints[0].PointToConvert = Item.RedempPoints[0].ConvertedDiscount / Item.RedempPoints[0].BasedPoint;
+    Retract("Rule1");
+}
 
-const engine = new Engine();
+rule Rule2SKU1 "Rule 3 - Product SKU1" {
+    when
+        (Item.Total >= 100 &&
+            Item.CLV > 2000 &&
+            Item.Channels[0] == 1 &&
+            Item.Source == "London1" &&
+            Item.Currency == "USD" &&
+            Item.Categories contains "New Collection" && Product.SKU == "SKU1") == true
+    then
+    Item.RedempPoints[0].ConversionRate = 1;
+    Item.RedempPoints[0].PointToConvert = Item.RedempPoints[0].ConversionRate;
 
-const rulesStorage = {};
+    Item.RedempVouchers[0].CollectionId = "0xCCC";
+    Item.RedempVouchers[0].PercentDiscount = 0.05;
+    Item.RedempVouchers[0].DiscountAmount = Item.Price * Item.Quantity * Item.RedempVouchers[0].PercentDiscount;
 
-app.post('/api/rules', (req, res) => {
-    const { name, conditions, event } = req.body;
-
-    if (!name || !conditions || !event) {
-        return res.status(400).json({ message: 'Name, conditions, and event are required' });
-    }
-
-    const rule = { conditions, event };
-    rulesStorage[name] = rule;
-
-    engine.addRule(rule);
-    res.status(201).json({ message: `Rule '${name}' created successfully` });
-});
-
-app.get('/api/rules/:name', (req, res) => {
-    const ruleName = req.params.name;
-    const rule = rulesStorage[ruleName];
-
-    if (!rule) {
-        return res.status(404).json({ message: `Rule '${ruleName}' not found` });
-    }
-
-    res.json(rule);
-});
-
-app.post('/api/rules/check', async (req, res) => {
-    const facts = req.body;
-
-    console.log("Received facts:", facts);
-
-    try {
-        const { events } = await engine.run(facts);
-        console.log("Triggered events:", events);
-        if (events.length > 0) {
-            res.json({ message: events.map(event => event.params.message) });
-        } else {
-            res.json({ message: 'No rules triggered' });
-        }
-    } catch (error) {
-        console.error("Error running engine:", error);
-        res.status(500).json({ message: error.message });
-    }
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+    Retract("Rule2SKU1");
+}

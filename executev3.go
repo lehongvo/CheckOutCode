@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"fmt"
 	"log"
 	"strings"
@@ -41,98 +40,90 @@ func (t Tier) String() string {
 	return [...]string{"Tier1", "Tier2", "Tier3", "Tier4", "Tier5"}[t]
 }
 
+// Product struct to represent individual products
+type Product struct {
+	SKU      string
+	Category string
+	Price    float64
+	Quantity int
+	Currency string
+}
+
+// Voucher struct to hold information for vouchers
+type Voucher struct {
+	CollectionId        string
+	PercentDiscount     float64
+	FixedAmountDiscount float64
+	DiscountAmount      float64
+}
+
+// RedempPoint struct representing redemption points
+type RedempPoint struct {
+	BasedPoint        float64
+	ConvertedDiscount float64
+	PointToConvert    float64
+	ConversionRate    float64
+}
+
+// Item struct representing a product in the cart
 type Item struct {
 	Total          float64
 	Amount         float64
-	PlaceOrderDate int
-
-	SKU       string
-	Category  string
-	Attribute map[string]string
-
-	Tier         Tier
-	RegisterDate string
-	CLV          int
-
-	Channels []Channel
-	StoreID  string
-
-	EventID      string
-	ReferralCode string
-	GameID       string
-	MissionID    string
-
-	Result    string
-	MintPoint int
-	Voucher   []string
-
-	Currency string
-	DebugLog string
+	PlaceOrderDate int64
+	Tier           Tier
+	Channels       []Channel
+	Source         string
+	Currency       string
+	CLV            float64
+	Products       []*Product
+	RedempVouchers []*Voucher
+	RedempPoints   []*RedempPoint // Declare RedempPoints as a slice of pointers
+	Result         string
 }
 
-// Tạo RuleHelper với hàm AddVoucher
+// RuleHelper structure with a method to add multiple vouchers
 type RuleHelper struct{}
 
-func (r *RuleHelper) AddVoucher(item *Item, voucher string) {
-	item.Voucher = append(item.Voucher, voucher)
+// AddVoucher adds vouchers to the item's RedempVouchers
+func (r *RuleHelper) AddVoucher(item *Item, vouchers ...*Voucher) {
+	item.RedempVouchers = append(item.RedempVouchers, vouchers...)
 }
 
-func ruleEngineDecode(encodedRuleText string) (string, error) {
-	encodedRuleText = strings.TrimSpace(encodedRuleText)
-
-	if len(encodedRuleText)%4 != 0 {
-		encodedRuleText += strings.Repeat("=", 4-len(encodedRuleText)%4)
-	}
-
-	decodedBytes, err := base64.StdEncoding.DecodeString(encodedRuleText)
-	if err != nil {
-		return "", err
-	}
-
-	decodedString := string(decodedBytes)
-	decodedString = strings.Replace(decodedString, `rule "`, `rule `, 1)
-	decodedString = strings.Replace(decodedString, `" {`, ` {`, 1)
-
-	return decodedString, nil
+// Contains checks if the category contains a substring
+func (r *RuleHelper) Contains(category, substring string) bool {
+	return strings.Contains(category, substring)
 }
 
-func helperTransformRule(ruleString string) string {
-	lines := strings.Split(ruleString, "\n")
-	var outputLines []string
+func applyRules(item *Item, product *Product, ruleName string, version string) error {
+	// Simplified rule string for testing
+	ruleString := `
+rule Rule2SKU1 "Rule 3 - Product SKU1" {
+    when
+        (Item.Total >= 100 &&
+            Item.CLV > 2000 &&
+            Item.Channels[0] == 1 &&
+            Item.Source == "London1" &&
+            Item.Currency == "USD" &&
+            Helper.Contains(Item.Products[0].Category, "Iphone") &&
+            Product.SKU == "SKU1") == true
+    then
+        Item.RedempPoints[0].ConversionRate = 1;
+        Item.RedempPoints[0].PointToConvert = Item.RedempPoints[0].ConversionRate;
 
-	for _, line := range lines {
-		if strings.Contains(line, "Item.MintPoint") {
-			continue
-		}
-		if strings.Contains(line, "Item.Voucher") {
-			startIdx := strings.Index(line, `{"collection_id":"`)
-			endIdx := strings.Index(line[startIdx:], `","`) + startIdx
-			if startIdx != -1 && endIdx != -1 {
-				collectionID := line[startIdx+18 : endIdx]
-				line = fmt.Sprintf("      Helper.AddVoucher(Item, \"%s\");", collectionID)
-			}
-		}
-		outputLines = append(outputLines, line)
-	}
+        Item.RedempVouchers[0].CollectionId = "0xCCC";
+        Item.RedempVouchers[0].PercentDiscount = 0.05;
+        Item.RedempVouchers[0].DiscountAmount = Product.Price * Product.Quantity * Item.RedempVouchers[0].PercentDiscount;
 
-	// Ghép lại các dòng thành một chuỗi mới
-	return strings.Join(outputLines, "\n")
+        Retract("Rule2SKU1");
 }
-
-func applyRules(item *Item, encodedRuleValue string, ruleName string, version string) error {
-	ruleString, err := ruleEngineDecode(encodedRuleValue)
-	if err != nil {
-		return fmt.Errorf("Error decoding rule: %v", err)
-	}
-
-	updatedRuleStringWithVoucherData := updateRuleString(ruleString)
-
-	updatedRuleString := helperTransformRule(updatedRuleStringWithVoucherData)
-
-	fmt.Printf("123%s\n", updatedRuleString)
-
+`
 	dataContext := ast.NewDataContext()
-	err = dataContext.Add("Item", item)
+	err := dataContext.Add("Item", item)
+	if err != nil {
+		return err
+	}
+
+	err = dataContext.Add("Product", product)
 	if err != nil {
 		return err
 	}
@@ -146,7 +137,7 @@ func applyRules(item *Item, encodedRuleValue string, ruleName string, version st
 	kb := ast.NewKnowledgeLibrary()
 	ruleBuilder := builder.NewRuleBuilder(kb)
 
-	resource := pkg.NewBytesResource([]byte(updatedRuleString))
+	resource := pkg.NewBytesResource([]byte(ruleString))
 	err = ruleBuilder.BuildRuleFromResource(ruleName, version, resource)
 	if err != nil {
 		return fmt.Errorf("failed to build rule '%s': %v", ruleName, err)
@@ -168,35 +159,91 @@ func applyRules(item *Item, encodedRuleValue string, ruleName string, version st
 	return nil
 }
 
-func updateRuleString(ruleString string) string {
-	objectsToReplace := []string{"Cart", "Product", "Customer", "Source", "Action"}
+// printItemDetails prints the details of the entire item, including products and vouchers
+func printItemDetails(item *Item) {
+	fmt.Printf("Item details:\n")
+	fmt.Printf("Total: %.2f\n", item.Total)
+	fmt.Printf("Amount: %.2f\n", item.Amount)
+	fmt.Printf("PlaceOrderDate: %d\n", item.PlaceOrderDate)
+	fmt.Printf("Tier: %s\n", item.Tier)
+	fmt.Printf("Channels: %v\n", item.Channels)
+	fmt.Printf("Source: %s\n", item.Source)
+	fmt.Printf("Currency: %s\n", item.Currency)
+	fmt.Printf("CLV: %.2f\n", item.CLV)
+	fmt.Printf("Result: %s\n", item.Result)
 
-	for _, obj := range objectsToReplace {
-		ruleString = strings.ReplaceAll(ruleString, obj+".", "Item.")
+	// Print each product in detail
+	fmt.Printf("\nProducts:\n")
+	for _, product := range item.Products {
+		fmt.Printf("- SKU: %s, Category: %s, Price: %.2f, Quantity: %d, Currency: %s\n",
+			product.SKU, product.Category, product.Price, product.Quantity, product.Currency)
 	}
 
-	return ruleString
+	// Print each point in detail
+	fmt.Printf("\nRedempPoints:\n")
+	for i, point := range item.RedempPoints {
+		fmt.Printf("- Point %d: BasedPoint=%.2f, ConvertedDiscount=%.2f, PointToConvert=%.2f, ConversionRate=%.2f\n",
+			i+1, point.BasedPoint, point.ConvertedDiscount, point.PointToConvert, point.ConversionRate)
+	}
+
+	// Print each voucher in detail
+	fmt.Printf("\nVouchers:\n")
+	for i, voucher := range item.RedempVouchers {
+		fmt.Printf("- Voucher %d: CollectionId=%s, PercentDiscount=%.2f, FixedAmountDiscount=%.2f, DiscountAmount=%.2f\n",
+			i+1, voucher.CollectionId, voucher.PercentDiscount, voucher.FixedAmountDiscount, voucher.DiscountAmount)
+	}
 }
 
 func main() {
 	item := &Item{
-		Total:          10000000,
-		Amount:         9000000,
+		Total:          150,
+		Amount:         6,
 		PlaceOrderDate: 1724235564,
-		SKU:            "SKU1",
-		Category:       "Iphone",
 		Tier:           Tier1,
-		Channels:       []Channel{Online, Offline},
+		Channels:       []Channel{Offline}, // Enum value for Offline
+		Source:         "London1",
 		Currency:       "USD",
-		DebugLog:       "",
+		CLV:            2500,
+		RedempPoints: []*RedempPoint{ // Initialize RedempPoints as a slice of pointers
+			&RedempPoint{},
+		},
+		Products: []*Product{
+			&Product{
+				SKU:      "SKU1",
+				Category: "Iphone",
+				Price:    10,
+				Quantity: 5,
+				Currency: "USD",
+			},
+			&Product{
+				SKU:      "SKU2",
+				Category: "Macbook",
+				Price:    100,
+				Quantity: 1,
+				Currency: "USD",
+			},
+			&Product{
+				SKU:      "SKU2",
+				Category: "Macbook",
+				Price:    100,
+				Quantity: 1,
+				Currency: "USD",
+			},
+		},
+		RedempVouchers: []*Voucher{
+			&Voucher{},
+			&Voucher{},
+		},
 	}
 
-	encodedRuleValue := `cnVsZSAiZGFzZHNhZCIgewogICAgd2hlbgogICAgICAxID09IDEKICAgIHRoZW4KICAgICAgQ2FydC5SZXN1bHQgPSAiQ29uZGl0aW9uIG1ldCI7CiAgICAgIENhcnQuTWludFBvaW50ID0gW3sicG9pbnRfY2FydF90b3RhbCI6eyJjdXJyZW5jeV9pZCI6MCwicG9pbnRfYW1vdW50IjoiIiwidmFsdWUiOiIiLCJhbW91bnRfdmFsdWUiOiIifSwicG9pbnRfcHJvZHVjdF9yZXdhcmQiOnsiY3VycmVuY3lfaWQiOjAsInByb2R1Y3RfbmFtZSI6IiIsInBvaW50X2Ftb3VudCI6IiIsInZhbHVlIjoiIiwiYW1vdW50X3ZhbHVlIjoiIn19XTsKICAgICAgQ2FydC5Wb3VjaGVyID0gW3siY29sbGVjdGlvbl9pZCI6IjNiOTY5MzE2LTVkZjMtNDIwZS1iNzhlLTk5OTJiMTkwMDZmOCIsInBvaW50X2NhcnRfdG90YWwiOnsiY3VycmVuY3lfaWQiOiJVU0QiLCJ2YWx1ZSI6IiIsImRpc2NvdW50X3JhdGUiOiIxIn0sInBvaW50X3Byb2R1Y3RfcmV3YXJkIjp7ImN1cnJlbmN5X2lkIjoiVVNEIiwicHJvZHVjdF9uYW1lIjp7ImlkIjoxLCJ2YWx1ZSI6Ik1vdXNlIExvZ2l0ZWNoIiwibGFiZWwiOiJNb3VzZSBMb2dpdGVjaCJ9LCJkaXNjb3VudF9yYXRlIjoiMSIsInZhbHVlIjoiIn19XTsKICAgICAgUmV0cmFjdCgiZGFzZHNhZCIpOwp9`
-
-	err := applyRules(item, encodedRuleValue, "CartAmount", "0.1.0")
-	if err != nil {
-		log.Fatalf("Error applying rules: %v", err)
+	// Loop through each product and apply the rule
+	for _, product := range item.Products {
+		err := applyRules(item, product, "Rule2SKU1", "0.1.0")
+		if err != nil {
+			log.Fatalf("Error applying rules: %v", err)
+		}
 	}
 
-	fmt.Printf("Item after rule execution: %+v\n", item)
+	// Print the entire item details after applying the rules
+	printItemDetails(item)
 }

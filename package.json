@@ -3,13 +3,14 @@
   "version": "1.0.0",
   "main": "index.js",
   "license": "MIT",
+  "type": "module",
   "dependencies": {
+    "@pinata/sdk": "^2.1.0",
     "axios": "^1.7.5",
-    "body-parser": "^1.20.2",
+    "body-parser": "^1.20.3",
     "dayjs": "^1.11.13",
     "express": "^4.19.2",
     "formatDate": "^1.0.0",
-    "json-rules-engine": "^6.5.0",
     "moment": "moment/moment",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.4"
@@ -17,6 +18,7 @@
   "devDependencies": {
     "@types/node": "^22.4.1",
     "eslint": "^7.32.0",
+    "json-rules-engine": "^6.5.0",
     "prettier": "^3.3.3"
   }
 }

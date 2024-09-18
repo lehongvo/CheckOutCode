@@ -1,175 +1,129 @@
+//  Copyright hyperjumptech/grule-rule-engine Authors
+//
+//  Licensed under the Apache License, Version 2.0 (the "License");
+//  you may not use this file except in compliance with the License.
+//  You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  Unless required by applicable law or agreed to in writing, software
+//  distributed under the License is distributed on an "AS IS" BASIS,
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+//  See the License for the specific language governing permissions and
+//  limitations under the License.
+
 package main
 
 import (
-	"encoding/base64"
+	"encoding/json"
 	"fmt"
-	"log"
-	"strings"
+
+	"github.com/hyperjumptech/grule-rule-engine/ast"
+	"github.com/hyperjumptech/grule-rule-engine/builder"
+	"github.com/hyperjumptech/grule-rule-engine/engine"
+	"github.com/hyperjumptech/grule-rule-engine/pkg"
 )
 
-// Enum for Channel
-type Channel int
-
-const (
-	Online Channel = iota
-	Offline
-	Marketplace
-	Partner
-)
-
-func (c Channel) String() string {
-	return [...]string{"Online", "Offline", "Marketplace", "Partner"}[c]
+// Define Go structs for the JSON data
+type Address struct {
+	Street string `json:"street"`
+	City   string `json:"city"`
+	State  string `json:"state"`
+	Postal int    `json:"postal"`
 }
 
-// Enum for Tier
-type Tier int
-
-const (
-	Tier1 Tier = iota
-	Tier2
-	Tier3
-	Tier4
-	Tier5
-)
-
-func (t Tier) String() string {
-	return [...]string{"Tier1", "Tier2", "Tier3", "Tier4", "Tier5"}[t]
+type Person struct {
+	Name    string   `json:"name"`
+	Age     int      `json:"age"`
+	Gender  string   `json:"gender"`
+	Height  float64  `json:"height"`
+	Married bool     `json:"married"`
+	Address Address  `json:"address"`
+	Friends []string `json:"friends"`
 }
 
-type Item struct {
-	Total          float64
-	Amount         float64
-	PlaceOrderDate int
+// Function to parse the JSON data into the Person struct
+func parseJSONData() (*Person, error) {
+	data := `{
+		"name" : "John Doe",
+		"age" : 24,
+		"gender" : "M",
+		"height" : 74.8,
+		"married" : false,
+		"address" : {
+			"street" : "9886 2nd St.",
+			"city" : "Carpentersville",
+			"state" : "Illinois",
+			"postal" : 60110
+		},
+		"friends" : [ "Roth", "Jane", "Jake" ]
+	}`
 
-	SKU       string
-	Category  string
-	Attribute map[string]string
-
-	Tier         Tier
-	RegisterDate string
-	CLV          int
-
-	Channels []Channel
-	StoreID  string
-
-	EventID      string
-	ReferralCode string
-	GameID       string
-	MissionID    string
-
-	Result    string
-	MintPoint int
-	Voucher   []string
-
-	Currency string
-	DebugLog string
-}
-
-// RuleHelper structure with a method to add multiple vouchers
-type RuleHelper struct{}
-
-func (r *RuleHelper) AddVoucher(item *Item, vouchers ...string) {
-	item.Voucher = append(item.Voucher, vouchers...)
-}
-
-func ruleEngineDecode(encodedRuleText string) (string, error) {
-	encodedRuleText = strings.TrimSpace(encodedRuleText)
-
-	if len(encodedRuleText)%4 != 0 {
-		encodedRuleText += strings.Repeat("=", 4-len(encodedRuleText)%4)
-	}
-
-	decodedBytes, err := base64.StdEncoding.DecodeString(encodedRuleText)
+	var person Person
+	err := json.Unmarshal([]byte(data), &person)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	decodedString := string(decodedBytes)
-	decodedString = strings.Replace(decodedString, `rule "`, `rule `, 1)
-	decodedString = strings.Replace(decodedString, `" {`, ` {`, 1)
-
-	return decodedString, nil
+	return &person, nil
 }
 
-func helperTransformRule(ruleString string) string {
-	lines := strings.Split(ruleString, "\n")
-	var outputLines []string
-	var collectionIDs []string
-	skipBlock := false
-
-	for _, line := range lines {
-		trimmedLine := strings.TrimSpace(line)
-
-		// Detect start of the RedempPoint block and skip it
-		if strings.Contains(trimmedLine, "Cart.RedempPoint = [") {
-			skipBlock = true
-		}
-		if skipBlock {
-			if strings.Contains(trimmedLine, "];") {
-				skipBlock = false
-			}
-			continue // Skip the entire RedempPoint block
-		}
-
-		// Handle the Cart.RedempVoucher block
-		if strings.Contains(trimmedLine, "Cart.RedempVoucher = [") {
-			collectionIDs = []string{} // Reset for safety
-			continue
-		} else if strings.Contains(trimmedLine, "Cart.CollectionId:") {
-			id := strings.Split(trimmedLine, ":")[1]
-			id = strings.Trim(id, " ,\"")
-			collectionIDs = append(collectionIDs, id)
-			continue
-		} else if strings.Contains(trimmedLine, "];") {
-			if len(collectionIDs) > 0 {
-				// Append the Helper.AddVoucher call after collecting all IDs
-				outputLines = append(outputLines, fmt.Sprintf("        Helper.AddVoucher(Item, \"%s\")", strings.Join(collectionIDs, "\", \"")))
-			}
-			continue
-		}
-
-		// Append lines that are outside any specific blocks
-		outputLines = append(outputLines, line)
-	}
-
-	return strings.Join(outputLines, "\n")
-}
-
-func applyRules(item *Item, encodedRuleValue string, ruleName string, version string) error {
-	ruleString, err := ruleEngineDecode(encodedRuleValue)
-	if err != nil {
-		return fmt.Errorf("Error decoding rule: %v", err)
-	}
-
-	// Transform the rule string to remove the RedempPoint section
-	transformedRuleString := helperTransformRule(ruleString)
-
-	fmt.Printf("Transformed rule: \n%s\n", transformedRuleString)
-
-	// Further rule processing can be added here
-
-	return nil
-}
-
+// Main function
 func main() {
-	item := &Item{
-		Total:          10000000,
-		Amount:         9000000,
-		PlaceOrderDate: 1724235564,
-		SKU:            "SKU1",
-		Category:       "Iphone",
-		Tier:           Tier1,
-		Channels:       []Channel{Online, Offline},
-		Currency:       "USD",
-		DebugLog:       "",
-	}
-
-	encodedRuleValue := `cnVsZSAiZGFzZHNhZCIgewogICAgd2hlbgogICAgICAxID09IDEKICAgIHRoZW4KICAgICAgQ2FydC5SZXN1bHQgPSAiQ29uZGl0aW9uIG1ldCI7CiAgICAgIENhcnQuTWludFBvaW50ID0gW3sicG9pbnRfY2FydF90b3RhbCI6eyJjdXJyZW5jeV9pZCI6MCwicG9pbnRfYW1vdW50IjoiIiwidmFsdWUiOiIiLCJhbW91bnRfdmFsdWUiOiIifSwicG9pbnRfcHJvZHVjdF9yZXdhcmQiOnsiY3VycmVuY3lfaWQiOjAsInByb2R1Y3RfbmFtZSI6IiIsInBvaW50X2Ftb3VudCI6IiIsInZhbHVlIjoiIiwiYW1vdW50X3ZhbHVlIjoiIn19XTsKICAgICAgQ2FydC5Wb3VjaGVyID0gW3siY29sbGVjdGlvbl9pZCI6IjNiOTY5MzE2LTVkZjMtNDIwZS1iNzhlLTk5OTJiMTkwMDZmOCIsInBvaW50X2NhcnRfdG90YWwiOnsiY3VycmVuY3lfaWQiOiJVU0QiLCJ2YWx1ZSI6IiIsImRpc2NvdW50X3JhdGUiOiIxIn0sInBvaW50X3Byb2R1Y3RfcmV3YXJkIjp7ImN1cnJlbmN5X2lkIjoiVVNEIiwicHJvZHVjdF9uYW1lIjp7ImlkIjoxLCJ2YWx1ZSI6Ik1vdXNlIExvZ2l0ZWNoIiwibGFiZWwiOiJNb3VzZSBMb2dpdGVjaCJ9LCJkaXNjb3VudF9yYXRlIjoiMSIsInZhbHVlIjoiIn19XTsKICAgICAgUmV0cmFjdCgiZGFzZHNhZCIpOwp9`
-
-	err := applyRules(item, encodedRuleValue, "CartAmount", "0.1.0")
+	// Parse the JSON data
+	person, err := parseJSONData()
 	if err != nil {
-		log.Fatalf("Error applying rules: %v", err)
+		fmt.Println("Error parsing JSON:", err)
+		return
 	}
 
-	fmt.Printf("Item after rule execution: %+v\n", item)
+	// Print the parsed data
+	fmt.Printf("Before Rule Execution:\n%+v\n\n", person)
+
+	// Create the data context and add the parsed person
+	dataContext := ast.NewDataContext()
+	err = dataContext.Add("Person", person)
+	if err != nil {
+		fmt.Println("Error adding person to context:", err)
+		return
+	}
+
+	// Define some rules
+	rule := `
+rule CheckPersonStatus "Check if the person is eligible" {
+    when
+        Person.Married == false && Person.Age < 30
+    then
+        Log("The person is eligible for the program.");
+        Retract("CheckPersonStatus");
+}
+`
+	// Create the knowledge library and rule builder
+	lib := ast.NewKnowledgeLibrary()
+	ruleBuilder := builder.NewRuleBuilder(lib)
+
+	// Build the rule from the string
+	err = ruleBuilder.BuildRuleFromResource("Test", "0.1.1", pkg.NewBytesResource([]byte(rule)))
+	if err != nil {
+		fmt.Println("Error building rule:", err)
+		return
+	}
+
+	// Create a knowledge base instance
+	kb, err := lib.NewKnowledgeBaseInstance("Test", "0.1.1")
+	if err != nil {
+		fmt.Println("Error creating knowledge base:", err)
+		return
+	}
+
+	// Create and execute the rules engine
+	eng1 := &engine.GruleEngine{MaxCycle: 1}
+	err = eng1.Execute(dataContext, kb)
+	if err != nil {
+		fmt.Println("Error executing rules:", err)
+		return
+	}
+
+	// Print the person data after rule execution
+	fmt.Printf("\nAfter Rule Execution:\n%+v\n", person)
 }
