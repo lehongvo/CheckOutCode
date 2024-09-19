@@ -4,7 +4,6 @@ go 1.22.6
 
 require (
 	github.com/hyperjumptech/grule-rule-engine v1.15.0
-	github.com/julienschmidt/httprouter v1.3.0
 	github.com/stretchr/testify v1.8.4
 )
 

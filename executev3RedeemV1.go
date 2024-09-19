@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/hyperjumptech/grule-rule-engine/ast"
 	"github.com/hyperjumptech/grule-rule-engine/builder"
@@ -10,7 +9,13 @@ import (
 	"github.com/hyperjumptech/grule-rule-engine/pkg"
 )
 
-// Product struct to represent individual products
+type Channel string
+
+const (
+	Offline Channel = "Offline"
+	Online  Channel = "Online"
+)
+
 type Product struct {
 	SKU      string
 	Category string
@@ -19,151 +24,180 @@ type Product struct {
 	Currency string
 }
 
-// Voucher struct to hold information for vouchers
-type Voucher struct {
-	CollectionId        string
-	PercentDiscount     float64
-	FixedAmountDiscount float64
-	DiscountAmount      float64
-}
-
-// RedempPoint struct representing redemption points
-type RedempPoint struct {
-	BasedPoint        float64
-	ConvertedDiscount float64
-	PointToConvert    float64
-	ConversionRate    float64
-}
-
-// Item struct representing a product in the cart
-type Item struct {
+type Order struct {
 	Total          float64
-	Amount         float64
-	PlaceOrderDate string
-	RedempVouchers []*Voucher
-	RedempPoints   []*RedempPoint
+	Amount         int
+	PlaceOrderDate int64
+	Tier           string
+	Channels       []Channel
+	Source         string
+	Currency       string
+	CLV            float64
+	Products       []*Product
 }
 
-// Helper struct with necessary helper methods for rule processing
-type Helper struct{}
-
-// ProcessPointRewards function to simulate rewards processing
-func (h *Helper) ProcessPointRewards(item *Item, rewardType string, index int, reward map[string]interface{}) {
-	if rewardType == "redeemPoints" {
-		if convRate, ok := reward["conversionRate"]; ok {
-			item.RedempPoints[index].ConversionRate = convRate.(float64)
-			item.RedempPoints[index].PointToConvert = item.RedempPoints[index].ConversionRate
-		}
-		if basedPoint, ok := reward["basedPoint"]; ok {
-			item.RedempPoints[index].BasedPoint = basedPoint.(float64)
-			if convertedDiscount, ok := reward["convertedDiscount"]; ok {
-				item.RedempPoints[index].ConvertedDiscount = convertedDiscount.(float64)
+// Hàm kiểm tra SKU
+func (o *Order) CheckSkuContains(skus []string) bool {
+	for _, sku := range skus {
+		for _, product := range o.Products {
+			if product.SKU == sku {
+				return true
 			}
 		}
-	} else if rewardType == "redeemVouchers" {
-		if percentDiscount, ok := reward["percentDiscount"]; ok {
-			item.RedempVouchers[index].PercentDiscount = percentDiscount.(float64)
-			item.RedempVouchers[index].DiscountAmount = item.Total * (percentDiscount.(float64) / 100)
-		}
-		if fixedDiscount, ok := reward["fixedAmountDiscount"]; ok {
-			item.RedempVouchers[index].FixedAmountDiscount = fixedDiscount.(float64)
-			item.RedempVouchers[index].DiscountAmount = fixedDiscount.(float64)
-		}
 	}
+	return false
 }
 
-// applyRules function to build and execute the rule engine
-func applyRules(item *Item, ruleName string, version string) error {
-	// Rule string that defines the logic in Grule
-	ruleString := `
+// Hàm kiểm tra Category
+func (o *Order) CheckCategoryContains(categories []string) bool {
+	for _, category := range categories {
+		for _, product := range o.Products {
+			if product.Category == category {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// Hàm xử lý phần thưởng
+func processRewards(order *Order, rewardType string, conversionRate float64, currency string, basedPoint int, convertedDiscount int, productId string) {
+	fmt.Printf("Processing %s: conversionRate=%f, currency=%s, basedPoint=%d, convertedDiscount=%d, productId=%s\n", rewardType, conversionRate, currency, basedPoint, convertedDiscount, productId)
+}
+
+// Hàm thực thi rule
+func executeRule(order *Order, customer *Customer, action *Action, skus []string, categories []string, rule string) error {
+	// Tạo knowledge base và builder
+	lib := ast.NewKnowledgeLibrary()
+	rb := builder.NewRuleBuilder(lib)
+
+	// Xây dựng rule từ resource
+	err := rb.BuildRuleFromResource("RedemptionRules", "0.0.1", pkg.NewBytesResource([]byte(rule)))
+	if err != nil {
+		return fmt.Errorf("Error building rule: %v", err)
+	}
+
+	kb, err := lib.NewKnowledgeBaseInstance("RedemptionRules", "0.0.1")
+	if err != nil {
+		return fmt.Errorf("Error getting knowledge base: %v", err)
+	}
+
+	// Tạo engine và DataContext
+	eng := engine.NewGruleEngine()
+	dctx := ast.NewDataContext()
+	dctx.Add("Order", order)
+	dctx.Add("Customer", customer)
+	dctx.Add("Action", action)
+	dctx.Add("Skus", skus)
+	dctx.Add("Categories", categories)
+	dctx.Add("processRewards", processRewards)
+
+	// Thực thi rule
+	err = eng.Execute(dctx, kb)
+	if err != nil {
+		return fmt.Errorf("Error executing rule: %v", err)
+	}
+	fmt.Println("Rule executed successfully.")
+	return nil
+}
+
+// Định nghĩa rule
+var RuleWithMoreConditions = `
 rule RuleWithMoreConditions "RuleWithMoreConditions" {
     when
-        (Item.Total >= 100 &&
-        Item.Amount >= 2 &&
-        Item.PlaceOrderDate >= "2023-01-01" && Item.PlaceOrderDate <= "2023-12-31") == true
+        Order.Total >= 100 &&
+        Order.Amount >= 2 &&
+        Order.PlaceOrderDate >= 1726655565 && Order.PlaceOrderDate <= 1726755565 &&
+        Order.CheckSkuContains(Skus) == true &&  // Thay thế danh sách SKU bằng biến Skus
+        Order.CheckCategoryContains(Categories) == true &&  // Thay thế danh sách Category bằng biến Categories
+        Customer.Tier == "Tier1" &&
+        Action.Event == "ABC123"
     then
-        Helper.ProcessPointRewards(Item, "redeemPoints", 0, { "conversionRate": 10 });
-        Helper.ProcessPointRewards(Item, "redeemPoints", 1, { "basedPoint": 2, "convertedDiscount": 10 });
-        Helper.ProcessPointRewards(Item, "redeemPoints", 2, { "conversionRate": 0.01, "productId": "A" });
-        Helper.ProcessPointRewards(Item, "redeemPoints", 3, { "basedPoint": 2, "convertedDiscount": 10, "productId": "A" });
-        Helper.ProcessPointRewards(Item, "redeemVouchers", 0, { "collectionId": "0xAAA", "percentDiscount": 5 });
-        Helper.ProcessPointRewards(Item, "redeemVouchers", 1, { "collectionId": "0xBBB", "fixedAmountDiscount": 100 });
-        Helper.ProcessPointRewards(Item, "redeemVouchers", 2, { "collectionId": "0xCCC", "percentDiscount": 5, "productId": "A" });
-        Helper.ProcessPointRewards(Item, "redeemVouchers", 3, { "collectionId": "0xDDD", "fixedAmountDiscount": 100, "productId": "A" });
+        processRewards(Order, "redeemPoints", 10.0, "USD", 0, 0, "");
+        processRewards(Order, "redeemPoints", 0.0, "USD", 2, 10, "");
+        processRewards(Order, "redeemPoints", 0.01, "USD", 0, 0, "A");
+        processRewards(Order, "redeemPoints", 0.0, "USD", 2, 10, "A");
+        processRewards(Order, "redeemVoucher", 0.0, "USD", 0, 0, "");
+        processRewards(Order, "redeemVoucher", 0.0, "USD", 0, 100, "");
+        processRewards(Order, "redeemVoucher", 0.0, "USD", 0, 0, "A");
+        processRewards(Order, "redeemVoucher", 0.0, "USD", 0, 100, "A");
         Retract("RuleWithMoreConditions");
 }
 `
 
-	// Initialize data context and add the item
-	dataContext := ast.NewDataContext()
-	err := dataContext.Add("Item", item)
-	if err != nil {
-		return err
+type Customer struct {
+	Tier string
+}
+
+type Action struct {
+	Event string
+}
+
+func printOrderDetails(order *Order) {
+	fmt.Println("===============")
+	fmt.Println("Order Details:")
+	fmt.Printf("Total: %.2f\n", order.Total)
+	fmt.Printf("Amount: %d\n", order.Amount)
+	fmt.Printf("Place Order Date: %d\n", order.PlaceOrderDate)
+	fmt.Printf("Tier: %s\n", order.Tier)
+	fmt.Printf("Channels: %v\n", order.Channels)
+	fmt.Printf("Source: %s\n", order.Source)
+	fmt.Printf("Currency: %s\n", order.Currency)
+	fmt.Printf("CLV: %.2f\n", order.CLV)
+	fmt.Println("Products:")
+	for i, product := range order.Products {
+		fmt.Println("===============")
+		fmt.Printf("  Product %d:\n", i+1)
+		fmt.Printf("    SKU: %s\n", product.SKU)
+		fmt.Printf("    Category: %s\n", product.Category)
+		fmt.Printf("    Price: %.2f\n", product.Price)
+		fmt.Printf("    Quantity: %d\n", product.Quantity)
+		fmt.Printf("    Currency: %s\n", product.Currency)
+		fmt.Println("===============")
 	}
 
-	// Add helper function
-	helper := &Helper{}
-	err = dataContext.Add("Helper", helper)
-	if err != nil {
-		return err
-	}
-
-	// Build the rule engine
-	kb := ast.NewKnowledgeLibrary()
-	ruleBuilder := builder.NewRuleBuilder(kb)
-	resource := pkg.NewBytesResource([]byte(ruleString))
-	err = ruleBuilder.BuildRuleFromResource(ruleName, version, resource)
-	if err != nil {
-		return fmt.Errorf("failed to build rule '%s': %v", ruleName, err)
-	}
-
-	// Create knowledge base instance
-	knowledgeBase, err := kb.NewKnowledgeBaseInstance(ruleName, version)
-	if err != nil {
-		return fmt.Errorf("failed to create knowledge base for rule '%s': %v", ruleName, err)
-	}
-
-	// Create and execute the engine
-	eng := engine.NewGruleEngine()
-	eng.MaxCycle = 1000
-	err = eng.Execute(dataContext, knowledgeBase)
-	if err != nil {
-		return fmt.Errorf("failed to execute rule engine for rule '%s': %v", ruleName, err)
-	}
-
-	return nil
 }
 
 func main() {
-	// Initialize the item and products
-	item := &Item{
+	// Tạo dữ liệu mẫu
+	order := &Order{
 		Total:          150,
 		Amount:         6,
-		PlaceOrderDate: "2023-06-15",
-		RedempPoints: []*RedempPoint{
-			{}, {}, {}, {}, // Initialize 4 reward points
-		},
-		RedempVouchers: []*Voucher{
-			{}, {}, {}, {}, // Initialize 4 vouchers
+		PlaceOrderDate: 1724235564,
+		Tier:           "Tier1",
+		Channels:       []Channel{Offline},
+		Source:         "London1",
+		Currency:       "USD",
+		CLV:            2500,
+		Products: []*Product{
+			&Product{
+				SKU:      "SKU1",
+				Category: "Iphone",
+				Price:    10,
+				Quantity: 5,
+				Currency: "USD",
+			},
+			&Product{
+				SKU:      "SKU2",
+				Category: "Macbook",
+				Price:    100,
+				Quantity: 1,
+				Currency: "USD",
+			},
 		},
 	}
 
-	// Apply the rule
-	err := applyRules(item, "RuleWithMoreConditions", "0.1.0")
+	customer := &Customer{Tier: "Tier1"}
+	action := &Action{Event: "ABC123"}
+
+	// Tạo danh sách SKU và Category
+	skus := []string{"SKU1", "SKU2"}
+	categories := []string{"Category1", "Category2"}
+
+	// Thực thi rule
+	err := executeRule(order, customer, action, skus, categories, RuleWithMoreConditions)
 	if err != nil {
-		log.Fatalf("Error applying rules: %v", err)
+		fmt.Println(err)
 	}
-
-	// Output the results after the rule has been applied
-	fmt.Println("Redemption Points:")
-	for i, rp := range item.RedempPoints {
-		fmt.Printf("Point %d: ConversionRate=%.2f, BasedPoint=%.2f, ConvertedDiscount=%.2f, PointToConvert=%.2f\n",
-			i+1, rp.ConversionRate, rp.BasedPoint, rp.ConvertedDiscount, rp.PointToConvert)
-	}
-
-	fmt.Println("Vouchers:")
-	for i, v := range item.RedempVouchers {
-		fmt.Printf("Voucher %d: CollectionId=%s, PercentDiscount=%.2f, FixedAmountDiscount=%.2f, DiscountAmount=%.2f\n",
-			i+1, v.CollectionId, v.PercentDiscount, v.FixedAmountDiscount, v.DiscountAmount)
-	}
+	printOrderDetails(order)
 }

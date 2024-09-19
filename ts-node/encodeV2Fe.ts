@@ -1,7 +1,7 @@
 interface Condition {
     field: string;
     operator: string;
-    value: string | number | [string | number];
+    value: string | number | [string | number] | any[];
 }
 
 interface PointReward {
@@ -9,15 +9,15 @@ interface PointReward {
     basedPoint: number;
     convertedDiscount: number;
     productId: string;
-    productName: string;
+    currency: string;
 }
 
 interface VoucherReward {
     collectionId: string;
-    discountType: "percent" | "fixed";
-    discountValue: number;
-    selectProduct: string;
-    productName: string;
+    percentDiscount: number;
+    fixedDiscount: number;
+    productId: string;
+    currency: string;
 }
 
 interface RedemptionRuleInput {
@@ -28,90 +28,114 @@ interface RedemptionRuleInput {
 
 function applyPointReward(index: number, point: PointReward): string {
     if (point.conversionRate > 0 && !point.productId) {
-        return `processRewards(Order, "redeemPoints", ${index}, { conversionRate: ${point.conversionRate} })`;
+        return `processRewards(Order, "redeemPoints", { conversionRate: ${point.conversionRate}, currency: "${point.currency}" })`;
     }
     if (point.conversionRate > 0 && point.productId) {
-        return `processRewards(Order, "redeemPoints", ${index}, { conversionRate: ${point.conversionRate}, productId: "${point.productId}" })`;
+        return `processRewards(Order, "redeemPoints", { conversionRate: ${point.conversionRate}, productId: "${point.productId}", currency: "${point.currency}" })`;
     }
     if (point.conversionRate == 0 && !point.productId) {
-        return `processRewards(Order, "redeemPoints", ${index}, { basedPoint: ${point.basedPoint}, convertedDiscount: ${point.convertedDiscount} })`;
+        return `processRewards(Order, "redeemPoints", { basedPoint: ${point.basedPoint}, convertedDiscount: ${point.convertedDiscount}, currency: "${point.currency}" })`;
     }
     if (point.conversionRate == 0 && point.productId) {
-        return `processRewards(Order, "redeemPoints", ${index}, { basedPoint: ${point.basedPoint}, convertedDiscount: ${point.convertedDiscount}, productId: "${point.productId}" })`;
+        return `processRewards(Order, "redeemPoints", { basedPoint: ${point.basedPoint}, convertedDiscount: ${point.convertedDiscount}, productId: "${point.productId}", currency: "${point.currency}" })`;
     }
     return '';
 }
 
 function applyVoucherReward(index: number, voucher: VoucherReward): string {
-    if (voucher.productName.length > 0) {
-        return `processRewards(Order, "redeemVouchers", ${index}, { collectionId: "${voucher.collectionId}", discountType: "${voucher.discountType}", discountValue: ${voucher.discountValue}, productId: "${voucher.selectProduct}", productName: "${voucher.productName}" })`;
+    if (voucher.percentDiscount > 0 && voucher.fixedDiscount == 0 && voucher.productId.length == 0) {
+        return `processRewards(Order, "redeemVoucher", { percentDiscount: ${voucher.percentDiscount}, currency: "${voucher.currency}" })`;
     }
-    return `processRewards(Order, "redeemVouchers", ${index}, { collectionId: "${voucher.collectionId}", discountType: "${voucher.discountType}", discountValue: ${voucher.discountValue}, productId: "${voucher.selectProduct}" })`;
+
+    if (voucher.percentDiscount == 0 && voucher.fixedDiscount > 0 && voucher.productId.length == 0) {
+        return `processRewards(Order, "redeemVoucher", { fixedDiscount: ${voucher.fixedDiscount}, currency: "${voucher.currency}" })`;
+    }
+
+    if (voucher.percentDiscount > 0 && voucher.fixedDiscount == 0 && voucher.productId.length >= 0) {
+        return `processRewards(Order, "redeemVoucher", { percentDiscount: ${voucher.percentDiscount}, productId: "${voucher.productId}", currency: "${voucher.currency}" })`;
+    }
+
+    if (voucher.percentDiscount == 0 && voucher.fixedDiscount > 0 && voucher.productId.length >= 0) {
+        return `processRewards(Order, "redeemVoucher", { fixedDiscount: ${voucher.fixedDiscount}, productId: "${voucher.productId}", currency: "${voucher.currency}" })`;
+    }
 }
 
 function generateRuleEngine(ruleName: string, input: RedemptionRuleInput) {
     const conditionStatements = input.conditions.map(condition => {
+        let structNameValue = "Order";
+        if (
+            condition.field == 'Tier' ||
+            condition.field == 'RegisterDate' ||
+            condition.field == 'Birthday' ||
+            condition.field == 'CLV'
+        ) {
+            structNameValue = "Customer";
+        }
+
+        if (
+            condition.field == 'Event' ||
+            condition.field == 'Referral' ||
+            condition.field == 'Game' ||
+            condition.field == 'Mission'
+        ) {
+            structNameValue = "Action";
+        }
         if (Array.isArray(condition.value)) {
             const values = condition.value.map(v => `"${v}"`).join(', ');
-            if (condition.operator === "between") {
-                return `Order.${condition.field} >= "${condition.value[0]}" && Order.${condition.field} <= "${condition.value[1]}"`;
+            if (condition.operator === 'in') {
+                if (condition.field == 'PlaceOrderDate') {
+                    return `${structNameValue}.${condition.field} >= ${condition.value[0]} && ${structNameValue}.${condition.field} <= ${condition.value[1]}`;
+                }
+                if (condition.field === 'SKU') {
+                    return `${structNameValue}.CheckSkuContains([${values}])`;
+                } else {
+                    return `${structNameValue}.CheckCategoryContains([${values}])`;
+                }
             }
-            return `Order.${condition.field} in [${values}]`;
+            return `${structNameValue}.${condition.field} in [${values}]`;
         }
-        return `Order.${condition.field} ${condition.operator} ${typeof condition.value === 'string' ? `"${condition.value}"` : condition.value}`;
+        return `${structNameValue}.${condition.field} ${condition.operator} ${typeof condition.value === 'string' ? `"${condition.value}"` : condition.value}`;
     }).join(' &&\n            ');
 
     const pointStatements = input.points.map((point, index) => applyPointReward(index, point)).join(';\n            ');
 
-    const voucherStatements = input.vouchers
-        .filter(voucher => voucher.productName.length === 0)
-        .map((voucher, index) => applyVoucherReward(index, voucher)).join(';\n            ');
-
-    const productNameRules = input.vouchers
-        .filter(voucher => voucher.productName.length > 0)
-        .map((voucher, index) => {
-            const productCondition = `Helper.Contains(Order.Products[0].ProductName, "${voucher.productName}")`;
-            return `rule ${ruleName}_${voucher.productName} "${ruleName} for ${voucher.productName}" {
-        when
-            (${conditionStatements} && ${productCondition}) == true
-        then
-            ${applyVoucherReward(index, voucher)};
-            Retract("${ruleName}_${voucher.productName}");
-    }`;
-        });
+    const voucherStatements = input.vouchers.map((voucher, index) => applyVoucherReward(index, voucher)).join(';\n            ');
 
     return `rule ${ruleName} "${ruleName}" {
         when
             (${conditionStatements}) == true
         then
             ${pointStatements};
-            ${voucherStatements};
+            ${voucherStatements}
             Retract("${ruleName}");
     }
-    ${productNameRules.join('\n\n    ')}`;
+    `;
 }
 
 const ruleInput: RedemptionRuleInput = {
     conditions: [
         { field: 'Total', operator: '>=', value: 100 },
         { field: 'Amount', operator: '>=', value: 2 },
-        { field: 'PlaceOrderDate', operator: 'between', value: ['2023-01-01', '2023-12-31'] }
+        // { field: 'PlaceOrderDate', operator: 'in', value: [1726655565, 1726755565] },
+        // { field: 'SKU', operator: 'in', value: ["SKU1"] },
+        // { field: 'Category', operator: 'in', value: ["Category1", "Category2"] },
+        // { field: 'Tier', operator: '==', value: "Tier1" },
+        // { field: 'Event', operator: '==', value: "ABC123" }
     ],
     points: [
-        { conversionRate: 10, basedPoint: 0, convertedDiscount: 0, productId: "", productName: "" },
-        { conversionRate: 0, basedPoint: 2, convertedDiscount: 10, productId: "", productName: "" },
-        { conversionRate: 0.01, basedPoint: 0, convertedDiscount: 0, productId: "A", productName: "" },
-        { conversionRate: 0, basedPoint: 2, convertedDiscount: 10, productId: "A", productName: "" }
+        { conversionRate: 10, basedPoint: 0, convertedDiscount: 0, productId: "", currency: "USD" },
+        { conversionRate: 0, basedPoint: 2, convertedDiscount: 10, productId: "", currency: "USD" },
+        { conversionRate: 0.01, basedPoint: 0, convertedDiscount: 0, productId: "A", currency: "USD" },
+        { conversionRate: 0, basedPoint: 2, convertedDiscount: 10, productId: "A", currency: "USD" }
     ],
     vouchers: [
-        { collectionId: "0xAAA", discountType: "percent", discountValue: 5, selectProduct: "", productName: "" },
-        { collectionId: "0xBBB", discountType: "fixed", discountValue: 100, selectProduct: "", productName: "" },
-        { collectionId: "0xCCC", discountType: "percent", discountValue: 5, selectProduct: "A", productName: "Iphone1" },
-        { collectionId: "0xDDD", discountType: "fixed", discountValue: 100, selectProduct: "A", productName: "Iphone2" }
+        { collectionId: "0xAAA", percentDiscount: 0.05, fixedDiscount: 0, productId: "", currency: "USD" },
+        { collectionId: "0xBBB", percentDiscount: 0, fixedDiscount: 100, productId: "", currency: "USD" },
+        { collectionId: "0xCCC", percentDiscount: 0.05, fixedDiscount: 0, productId: "A", currency: "USD" },
+        { collectionId: "0xDDD", percentDiscount: 0, fixedDiscount: 100, productId: "A", currency: "USD" }
     ]
 };
 
-// Generate rule engine
 const ruleEngine = generateRuleEngine("RuleWithMoreConditions", ruleInput);
 
 console.log(ruleEngine);

@@ -1,35 +1,52 @@
-const functionTest = (encodedRuleParams) => {
-    const ruleString = Buffer.from(encodedRuleParams, 'base64').toString('utf-8');
-    console.log(ruleString); // Debugging output to see the decoded rule string
+const axios = require('axios');
 
-    const convertToJsonArray = (arrayStr) => {
-        return arrayStr
-            .replace(/([a-zA-Z0-9_.]+)\s*:/g, '"$1":') // Properly quote JSON keys
-            .replace(/'([^']+)'/g, '"$1"') // Convert single to double quotes for JSON strings
-            .replace(/,\s*([}\]])/g, '$1') // Remove trailing commas
-            .replace(/([\{\[])\s*,/g, '$1') // Remove leading commas
-            .replace(/:\s*([a-zA-Z_]+[a-zA-Z0-9_.]*)\s*([,}\]])/g, ': "$1"$2') // Quote unquoted non-numeric values
-            .replace(/:\s*([\d\.\-]+)\s*([\-\+*\/])\s*([\d\.\-]+)/g, ': "$1 $2 $3"') // Correctly encapsulate mathematical expressions as strings
-            .replace(/:\s*(Cart\.Total\s*[\-\+*\/]\s*[\d\.]+)/g, ':"$1"'); // Specifically handle cases with Cart.Total operations
-    };
-
-    const extractAndConvertArray = (rule, key) => {
-        const pattern = new RegExp(`${key}\\s*=\\s*\\[([^\\]]+)\\]`, 'g');
-        const match = pattern.exec(rule);
-        if (match) {
-            const formattedArray = convertToJsonArray(match[1]);
-            return JSON.parse(`[${formattedArray}]`);
+// Hàm để gọi API
+async function callApi() {
+    let config = {
+        method: 'get',
+        maxBodyLength: Infinity,
+        url: 'https://poker-admin-be-dev.esports-bet.io/api/v1/sub-admins',
+        headers: {
+            'accept': '*/*',
+            'accept-language': 'vi-VN,vi;q=0.9,fr-FR;q=0.8,fr;q=0.7,en-US;q=0.6,en;q=0.5,ja;q=0.4',
+            'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY2YjFlOGE5MmNiNTkxZThkZDExODE2NyIsImlhdCI6MTcyNjQ1NTIyOCwiZXhwIjoxNzM0MjMxMjI4fQ.Y9Yrxbej62ZTN7YXaHG4gX9Eqzqs_APoL2ObFq58I5Y',
+            'cache-control': 'no-cache',
+            'origin': 'http://192.168.150.57:8080',
+            'pragma': 'no-cache',
+            'priority': 'u=1, i',
+            'referer': 'http://192.168.150.57:8080/',
+            'sec-ch-ua': '"Chromium";v="128", "Not;A=Brand";v="24", "Google Chrome";v="128"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'cross-site',
+            'timezone': '7',
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+            'Cookie': 'jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY2ZGU1ZTZkMDk1MmVkMDAyNzI1MjkzMyIsImlhdCI6MTcyNTg1NzMyNiwiZXhwIjoxNzMzNjMzMzI2fQ.-0QxfgUR5qaMM2gwwEGkblycKPWeMIiB-QUKn9tVt8A'
         }
-        return [];
     };
 
-    const redempPoint = extractAndConvertArray(ruleString, "RedempPoint");
-    const redempVoucher = extractAndConvertArray(ruleString, "RedempVoucher");
+    try {
+        const response = await axios.request(config);
+        console.log(JSON.stringify(response.data));
+    } catch (error) {
+        console.error(error);
+    }
+}
 
-    return { RedempPoint: redempPoint, RedempVoucher: redempVoucher };
-};
+// Loop gọi API 10 lần
+async function callApiMultipleTimes() {
+    for (let i = 0; i < 100000; i++) {
+        console.log(`=============> Call attempt: ${i + 1}\n`);
+        console.log(`Call attempt: ${i + 1}`);
+        await callApi();
 
-// Example use of the function with base64 encoded rule data
-const encodedData = 'cnVsZSAiZmFzZHMiIHsKICAgICAgd2hlbgogICAgICAgIENhcnQuVG90YWwgPT0gMQogICAgICB0aGVuCiAgICAgICAgQ2FydC5SZXN1bHQgPSAiQ29uZGl0aW9uIG1ldCI7CiAgICAgICAgQ2FydC5SZWRlbXBQb2ludCA9IFsKICAgICAgICAgICAgewogICAgICAgICAgICAgIENhcnQuSXNDYXJ0VG90YWw6IHRydWUsCiAgICAgICAgICAgICAgQ2FydC5Qb2ludEFtb3VudDogIjAiLAogICAgICAgICAgICAgIENhcnQuQ3VycmVuY3k6ICJWTkQiLAogICAgICAgICAgICAgIENhcnQuTWludFBvaW50OiAxMQogICAgICAgICAgICB9LAogICAgICAgICAgICB7CiAgICAgICAgICAgICAgQ2FydC5Jc0NhcnRUb3RhbDogZmFsc2UsCiAgICAgICAgICAgICAgIENhcnQuUHJvZHVjdE5hbWU6ICJLZXkgRkwgU3BvcnQiLAogICAgICAgICAgICAgIENhcnQuUG9pbnRBbW91bnQ6ICIyIiwKICAgICAgICAgICAgICBDYXJ0LkN1cnJlbmN5OiAiVVNEIiwKICAgICAgICAgICAgICBDYXJ0Lk1pbnRQb2ludDogNAogICAgICAgICAgICB9XTsKICAgICAgICBDYXJ0LlJlZGVtcFZvdWNoZXIgPSBbCiAgICAgICAgICAgIHsKICAgICAgICAgICAgICBDYXJ0LkNvbGxlY3Rpb25JZDogIjNiOTY5MzE2LTVkZjMtNDIwZS1iNzhlLTk5OTJiMTkwMDZmOCIsCiAgICAgICAgICAgICAgQ2FydC5Jc0NhcnRUb3RhbDogZmFsc2UsCiAgICAgICAgICAgICAgQ2FydC5Qcm9kdWN0TmFtZTogIk1vdXNlIExvZ2l0ZWNoIiwKICAgICAgICAgICAgICBDYXJ0LlRvdGFsOiBDYXJ0LlRvdGFsIC0gMSwKICAgICAgICAgICAgICBDYXJ0LkN1cnJlbmN5OiAiVk5EIiwKICAgICAgICAgICAgfSwKICAgICAgICAgICAgewogICAgICAgICAgICAgIENhcnQuQ29sbGVjdGlvbklkOiAiZDcwZGE2ZDUtZGJmYS00ZmU1LThhNWQtNjRiMjA1OGM0OGYwIiwKICAgICAgICAgICAgICBDYXJ0LklzQ2FydFRvdGFsOiB0cnVlLAogICAgICAgICAgICAgIENhcnQuVG90YWw6IENhcnQuVG90YWwgKiAwLjg4LAogICAgICAgICAgICB9XTsKICAgICAgICBSZXRyYWN0KCJmYXNkcyIpOwogIH0';
-const result = functionTest(encodedData);
-console.log(result);
+        // Thêm thời gian trễ giữa các lần gọi nếu cần, ở đây là 1 giây (1000ms)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log(`=============> Call attempt: ${i + 1}\n`);
+    }
+}
+
+callApiMultipleTimes();
+unlimit

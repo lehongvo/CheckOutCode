@@ -1,129 +1,90 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/http"
-	"sync"
+	"log"
 
 	"github.com/hyperjumptech/grule-rule-engine/ast"
 	"github.com/hyperjumptech/grule-rule-engine/builder"
 	"github.com/hyperjumptech/grule-rule-engine/engine"
 	"github.com/hyperjumptech/grule-rule-engine/pkg"
-	"github.com/julienschmidt/httprouter"
 )
 
-type Rule struct {
-	Name       string `json:"name"`
-	Version    string `json:"version"`
-	RuleString string `json:"ruleString"`
+type TotalHelper struct {
+	ArrayA []int
 }
 
-var rulesStorage = struct {
-	sync.RWMutex
-	data map[string]Rule
-}{data: make(map[string]Rule)}
-
-// func main() {
-// 	router := httprouter.New()
-// 	router.POST("/api/rules", createRule)
-// 	router.GET("/api/rules/:name", getRule)
-// 	router.POST("/api/rules/check", checkRules)
-
-// 	log.Println("Server is running on port 3000")
-// 	log.Fatal(http.ListenAndServe(":3000", router))
-// }
-
-func createRule(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	var rule Rule
-	err := json.NewDecoder(r.Body).Decode(&rule)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+func (th *TotalHelper) Contains(value int) bool {
+	fmt.Printf("Checking if %d is in array: %v\n", value, th.ArrayA)
+	for _, v := range th.ArrayA {
+		if v == value {
+			fmt.Println("Value found in array!")
+			return true
+		}
 	}
-
-	if rule.Name == "" || rule.Version == "" || rule.RuleString == "" {
-		http.Error(w, "Name, version, and ruleString are required", http.StatusBadRequest)
-		return
-	}
-
-	rulesStorage.Lock()
-	rulesStorage.data[rule.Name] = rule
-	rulesStorage.Unlock()
-
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"message": fmt.Sprintf("Rule '%s' created successfully", rule.Name)})
+	fmt.Println("Value not found in array.")
+	return false
 }
 
-func getRule(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	ruleName := ps.ByName("name")
-
-	rulesStorage.RLock()
-	rule, exists := rulesStorage.data[ruleName]
-	rulesStorage.RUnlock()
-
-	if !exists {
-		http.Error(w, fmt.Sprintf("Rule '%s' not found", ruleName), http.StatusNotFound)
-		return
+func (th *TotalHelper) SimpleCheck(value int) {
+	if th.Contains(value) {
+		fmt.Printf("Simple check: %d found in array\n", value)
+	} else {
+		fmt.Printf("Simple check: %d not found in array\n", value)
 	}
-
-	json.NewEncoder(w).Encode(rule)
 }
 
-func checkRules(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	var facts map[string]interface{}
-	err := json.NewDecoder(r.Body).Decode(&facts)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+func main() {
+	totalHelper := &TotalHelper{
+		ArrayA: []int{1, 2, 3, 4, 5}, // ArrayA chứa các giá trị
 	}
 
-	fmt.Println("Facts received:", facts)
+	// Kiểm tra trực tiếp logic Contains
+	found := totalHelper.Contains(1)
+	log.Printf("Direct call to Contains: Value found: %v\n", found)
 
+	// Tạo DataContext và đăng ký TotalHelper
 	dataContext := ast.NewDataContext()
-	for key, value := range facts {
-		err := dataContext.Add(key, value)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+	err := dataContext.Add("TotalHelper", totalHelper) // Đăng ký TotalHelper vào DataContext
+	if err != nil {
+		log.Fatalf("Error adding TotalHelper to DataContext: %v", err)
 	}
 
-	kb := ast.NewKnowledgeLibrary()
-	ruleBuilder := builder.NewRuleBuilder(kb)
+	// Định nghĩa rule sử dụng hàm SimpleCheck
+	dsl := `
+    rule CheckValueInArray "Check if value is in TotalHelper.ArrayA" {
+        when
+            true
+        then
+            TotalHelper.SimpleCheck(1);
+            Log("Rule executed. Value checked in array.");
+    }
+    `
 
-	rulesStorage.RLock()
-	for _, rule := range rulesStorage.data {
-		resource := pkg.NewBytesResource([]byte(rule.RuleString))
-		err = ruleBuilder.BuildRuleFromResource(rule.Name, rule.Version, resource)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to build rule '%s': %v", rule.Name, err), http.StatusInternalServerError)
-			return
-		}
+	// Tạo KnowledgeLibrary
+	lib := ast.NewKnowledgeLibrary()
+
+	// Tạo RuleBuilder với KnowledgeLibrary
+	ruleBuilder := builder.NewRuleBuilder(lib)
+
+	// Xây dựng rule từ dsl
+	err = ruleBuilder.BuildRuleFromResource("MyKnowledgeBase", "0.0.1", pkg.NewBytesResource([]byte(dsl)))
+	if err != nil {
+		panic(err)
 	}
 
-	rulesStorage.RUnlock()
-
-	for _, rule := range rulesStorage.data {
-		fmt.Println("Attempting to create KnowledgeBase instance for:", rule.Name, rule.Version)
-		knowledgeBase, err := kb.NewKnowledgeBaseInstance(rule.Name, rule.Version)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to create knowledge base for rule '%s': %v", rule.Name, err), http.StatusInternalServerError)
-			return
-		}
-
-		eng := engine.NewGruleEngine()
-		eng.MaxCycle = 1000
-
-		fmt.Println("Rule execution started for:", rule.Name)
-		err = eng.Execute(dataContext, knowledgeBase)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to execute rule engine for rule '%s': %v", rule.Name, err), http.StatusInternalServerError)
-			return
-		}
+	// Lấy KnowledgeBaseInstance và xử lý lỗi nếu có
+	kb, err := lib.NewKnowledgeBaseInstance("MyKnowledgeBase", "0.0.1")
+	if err != nil {
+		panic(err)
 	}
 
-	fmt.Println("Facts after rule execution:", facts)
+	// Tạo và chạy engine
+	ruleEngine := engine.NewGruleEngine()
+	err = ruleEngine.Execute(dataContext, kb)
+	if err != nil {
+		log.Fatalf("Error executing rule: %v", err)
+	}
 
-	json.NewEncoder(w).Encode(facts)
+	fmt.Println("Rule executed successfully!")
 }
