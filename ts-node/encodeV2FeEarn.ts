@@ -4,26 +4,23 @@ interface Condition {
     value: string | number | [string | number] | any[];
 }
 
-interface PointReward {
+interface PointRewardEarnRule {
     conversionRate: number;
+    fixedPoint: number;
+    basedAmount: number;
     basedPoint: number;
-    convertedDiscount: number;
     productId: string;
     currency: string;
 }
 
-interface VoucherReward {
+interface VoucherRewardEarnRule {
     collectionId: string;
-    percentDiscount: number;
-    fixedDiscount: number;
-    productId: string;
-    currency: string;
 }
 
-interface RedemptionRuleInput {
+interface EarnRuleInput {
     conditions: Condition[];
-    points: PointReward[];
-    vouchers: VoucherReward[];
+    points: PointRewardEarnRule[];
+    vouchers: VoucherRewardEarnRule[];
     conditionKey: ConditionKey;
     conditionStatus: boolean;
 }
@@ -33,46 +30,46 @@ enum ConditionKey {
     ANY = 'any'
 }
 
-function applyPointReward(index: number, point: PointReward): string {
-    if (point.conversionRate > 0 && !point.productId) {
-        return `processRewards(Order, "redeemPoints", { conversionRate: ${point.conversionRate}, currency: "${point.currency}" })`;
+function applyPointReward(index: number, point: PointRewardEarnRule): string {
+    if (point.conversionRate > 0 && point.productId.length == 0) {
+        return `processRewards(Order, "earningPoints", { conversionRate: ${point.conversionRate}, currency: "${point.currency}" })`;
     }
-    if (point.conversionRate > 0 && point.productId) {
-        return `processRewards(Order, "redeemPoints", { conversionRate: ${point.conversionRate}, productId: "${point.productId}", currency: "${point.currency}" })`;
+
+    if (point.conversionRate > 0 && point.productId.length > 0) {
+        return `processRewards(Order, "earningPoints", { conversionRate: ${point.conversionRate}, productId: "${point.productId}", currency: "${point.currency}" })`;
     }
-    if (point.conversionRate == 0 && !point.productId) {
-        return `processRewards(Order, "redeemPoints", { basedPoint: ${point.basedPoint}, convertedDiscount: ${point.convertedDiscount}, currency: "${point.currency}" })`;
+
+    if (point.fixedPoint > 0 && point.productId.length == 0) {
+        return `processRewards(Order, "earningPoints", { fixedPoint: ${point.fixedPoint} })`;
     }
-    if (point.conversionRate == 0 && point.productId) {
-        return `processRewards(Order, "redeemPoints", { basedPoint: ${point.basedPoint}, convertedDiscount: ${point.convertedDiscount}, productId: "${point.productId}", currency: "${point.currency}" })`;
+
+    if (point.fixedPoint > 0 && point.productId.length > 0) {
+        return `processRewards(Order, "earningPoints", { fixedPoint: ${point.fixedPoint}, productId: "${point.productId}" })`;
     }
+
+    if (point.basedAmount > 0 && point.basedPoint > 0 && point.productId.length == 0) {
+        return `processRewards(Order, "earningPoints", { basedAmount: ${point.basedAmount}, basedPoint: ${point.basedPoint}, currency: "${point.currency}" })`;
+    }
+
+    if (point.basedAmount > 0 && point.basedPoint > 0 && point.productId.length > 0) {
+        return `processRewards(Order, "earningPoints", { basedAmount: ${point.basedAmount}, basedPoint: ${point.basedPoint}, productId: "${point.productId}", currency: "${point.currency}" })`;
+    }
+
     return '';
 }
 
-function applyVoucherReward(index: number, voucher: VoucherReward): string {
-    if (voucher.percentDiscount > 0 && voucher.fixedDiscount == 0 && voucher.productId.length == 0) {
-        return `processRewards(Order, "redeemVoucher", { collectionId: ${voucher.collectionId}, percentDiscount: ${voucher.percentDiscount}, currency: "${voucher.currency}" })`;
+function applyVoucherReward(index: number, voucher: VoucherRewardEarnRule): string {
+    if (voucher.collectionId.length > 0) {
+        return `processRewards(Order, "earningVouchers", { collectionId: "${voucher.collectionId}" })`;
     }
-
-    if (voucher.percentDiscount == 0 && voucher.fixedDiscount > 0 && voucher.productId.length == 0) {
-        return `processRewards(Order, "redeemVoucher", { collectionId: ${voucher.collectionId}, fixedDiscount: ${voucher.fixedDiscount}, currency: "${voucher.currency}" })`;
-    }
-
-    if (voucher.percentDiscount > 0 && voucher.fixedDiscount == 0 && voucher.productId.length >= 0) {
-        return `processRewards(Order, "redeemVoucher", { collectionId: ${voucher.collectionId}, percentDiscount: ${voucher.percentDiscount}, productId: "${voucher.productId}", currency: "${voucher.currency}" })`;
-    }
-
-    if (voucher.percentDiscount == 0 && voucher.fixedDiscount > 0 && voucher.productId.length >= 0) {
-        return `processRewards(Order, "redeemVoucher", { collectionId: ${voucher.collectionId},  fixedDiscount: ${voucher.fixedDiscount}, productId: "${voucher.productId}", currency: "${voucher.currency}" })`;
-    }
+    return '';
 }
 
 function ruleEngineEncode(ruleText: string): string {
     return Buffer.from(ruleText).toString('base64');
 }
 
-
-function generateRuleEngine(ruleName: string, input: RedemptionRuleInput) {
+function generateRuleEngine(ruleName: string, input: EarnRuleInput) {
     const conditionOperator = input.conditionKey === ConditionKey.ALL ? '&&' : '||';
     const conditionStatements = input.conditions.map(condition => {
         let structNameValue = "Order";
@@ -94,7 +91,6 @@ function generateRuleEngine(ruleName: string, input: RedemptionRuleInput) {
             structNameValue = "Action";
         }
 
-        // Check for arrays in SKU or Category
         if (Array.isArray(condition.value)) {
             const values = condition.value.map(v => `"${v}"`);
             if (
@@ -205,7 +201,7 @@ function generateRuleEngine(ruleName: string, input: RedemptionRuleInput) {
         (${conditionStatements}) == ${input.conditionStatus}
     then
         ${pointStatements};
-        ${voucherStatements}
+        ${voucherStatements};
         Retract("${ruleName}");
 }
 `;
@@ -214,56 +210,24 @@ function generateRuleEngine(ruleName: string, input: RedemptionRuleInput) {
     }
 }
 
-const ruleInput: RedemptionRuleInput = {
+const ruleInput: EarnRuleInput = {
     conditions: [
-        { field: "SKU", operator: "in", value: "SKU10" },
         { field: 'Total', operator: '>=', value: 100 },
-        { field: '≈', operator: '==', value: [1726765200] },
         { field: 'PlaceOrderDate', operator: 'not in', value: [1726655565, 1726755565] },
-        { field: 'SKU', operator: 'in', value: ["SKU1"] },
-        { field: 'Category', operator: 'not in', value: ["Category1", "Category2"] },
-        { field: 'Tier', operator: '==', value: "Tier1" },
-        { field: 'Event', operator: '==', value: "ABC123" },
-        // {
-        //     "field": "Birthday",
-        //     "operator": "in",
-        //     "value": [
-        //         1727024400,
-        //         1727110800
-        //     ]
-        // },
-        // {
-        //     "field": "RegisterDate",
-        //     "operator": "in",
-        //     "value": [
-        //         1726851600,
-        //         1726938000
-        //     ]
-        // },
-        // {
-        //     "field": "Event",
-        //     "operator": "in",
-        //     "value": [
-        //         "EVENT1",
-        //         "EVENT2",
-        //         "EVENT3"
-        //     ]
-        // }
-        {
-            field: 'Mission',
-            operator: 'in',
-            value: 'MISS1 Miss2',
-        },
-
+        { field: 'Channel', operator: 'in', value: ["Offline"] },
+        { field: 'Source', operator: 'in', value: ["London1"] },
+        { field: "SKU", operator: "in", value: ["SKU1, SKU2, SKU3"] },
     ],
     points: [
-        { conversionRate: 10, basedPoint: 0, convertedDiscount: 0, productId: "", currency: "USD" },
-        { conversionRate: 0, basedPoint: 2, convertedDiscount: 10, productId: "", currency: "USD" },
-        { conversionRate: 0.01, basedPoint: 0, convertedDiscount: 0, productId: "A", currency: "USD" },
-        { conversionRate: 0, basedPoint: 2, convertedDiscount: 10, productId: "A", currency: "USD" }
+        { conversionRate: 10, fixedPoint: 0, basedAmount: 0, basedPoint: 0, productId: "", currency: "USD" },
+        { conversionRate: 0, fixedPoint: 20, basedAmount: 0, basedPoint: 0, productId: "", currency: "USD" },
+        { conversionRate: 0, fixedPoint: 0, basedAmount: 10, basedPoint: 3, productId: "", currency: "USD" },
+        { conversionRate: 0.01, fixedPoint: 0, basedAmount: 0, basedPoint: 0, productId: "A", currency: "USD" },
+        { conversionRate: 0, fixedPoint: 20, basedAmount: 0, basedPoint: 0, productId: "B", currency: "USD" },
+        { conversionRate: 0, fixedPoint: 0, basedAmount: 10, basedPoint: 3, productId: "C", currency: "USD" },
     ],
     vouchers: [
-        { collectionId: "0xAAA", percentDiscount: 0.05, fixedDiscount: 0, productId: "", currency: "USD" },
+        { collectionId: "0xAAA" }
     ],
     conditionKey: ConditionKey.ALL,
     conditionStatus: true

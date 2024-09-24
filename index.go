@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/hyperjumptech/grule-rule-engine/ast"
 	"github.com/hyperjumptech/grule-rule-engine/builder"
@@ -10,81 +9,203 @@ import (
 	"github.com/hyperjumptech/grule-rule-engine/pkg"
 )
 
-type TotalHelper struct {
-	ArrayA []int
+// Tạo slice toàn cục để lưu trữ kết quả processRewards
+var rewardResults []map[string]interface{}
+
+type Channel string
+
+const (
+	Offline Channel = "Offline"
+	Online  Channel = "Online"
+)
+
+type Product struct {
+	SKU      string
+	Category string
+	Price    float64
+	Quantity int
+	Currency string
 }
 
-func (th *TotalHelper) Contains(value int) bool {
-	fmt.Printf("Checking if %d is in array: %v\n", value, th.ArrayA)
-	for _, v := range th.ArrayA {
-		if v == value {
-			fmt.Println("Value found in array!")
-			return true
+type Order struct {
+	Total               float64
+	Amount              int
+	PlaceOrderDate      int64
+	Tier                string
+	Channels            []Channel
+	Source              string
+	Currency            string
+	CLV                 float64
+	Products            []*Product
+	SkuCheckResult      bool
+	CategoryCheckResult bool
+}
+
+type Customer struct {
+	Tier string
+}
+
+type Action struct {
+	Event string
+}
+
+// RewardProcessor chứa hàm processRewards
+type RewardProcessor struct{}
+
+// Hàm xử lý phần thưởng và lưu vào biến toàn cục
+func (rp *RewardProcessor) ProcessRewards(order *Order, rewardType string, conversionRate float64, currency string, productId string, basedPoint float64, convertedDiscount float64) {
+	result := map[string]interface{}{
+		"order":      order,
+		"rewardType": rewardType,
+		"currency":   currency,
+	}
+
+	// Chỉ thêm vào map nếu giá trị hợp lệ
+	if conversionRate != 0 {
+		result["conversionRate"] = conversionRate
+	}
+	if productId != "" {
+		result["productId"] = productId
+	}
+	if basedPoint != 0 {
+		result["basedPoint"] = basedPoint
+	}
+	if convertedDiscount != 0 {
+		result["convertedDiscount"] = convertedDiscount
+	}
+
+	// Lưu kết quả
+	rewardResults = append(rewardResults, result)
+}
+
+// Hàm kiểm tra SKU
+func (o *Order) CheckSkuContains(skus ...string) bool {
+	for _, sku := range skus {
+		for _, product := range o.Products {
+			if product.SKU == sku {
+				return true
+			}
 		}
 	}
-	fmt.Println("Value not found in array.")
 	return false
 }
 
-func (th *TotalHelper) SimpleCheck(value int) {
-	if th.Contains(value) {
-		fmt.Printf("Simple check: %d found in array\n", value)
-	} else {
-		fmt.Printf("Simple check: %d not found in array\n", value)
+// Hàm kiểm tra Category
+func (o *Order) CheckCategoryContains(categories ...string) bool {
+	for _, category := range categories {
+		for _, product := range o.Products {
+			if product.Category == category {
+				return true
+			}
+		}
 	}
+	return false
 }
 
-func main() {
-	totalHelper := &TotalHelper{
-		ArrayA: []int{1, 2, 3, 4, 5}, // ArrayA chứa các giá trị
-	}
-
-	// Kiểm tra trực tiếp logic Contains
-	found := totalHelper.Contains(1)
-	log.Printf("Direct call to Contains: Value found: %v\n", found)
-
-	// Tạo DataContext và đăng ký TotalHelper
-	dataContext := ast.NewDataContext()
-	err := dataContext.Add("TotalHelper", totalHelper) // Đăng ký TotalHelper vào DataContext
-	if err != nil {
-		log.Fatalf("Error adding TotalHelper to DataContext: %v", err)
-	}
-
-	// Định nghĩa rule sử dụng hàm SimpleCheck
-	dsl := `
-    rule CheckValueInArray "Check if value is in TotalHelper.ArrayA" {
-        when
-            true
-        then
-            TotalHelper.SimpleCheck(1);
-            Log("Rule executed. Value checked in array.");
-    }
-    `
-
-	// Tạo KnowledgeLibrary
+// Hàm thực thi rule
+func executeRule(order *Order, customer *Customer, action *Action, rule string) error {
+	// Tạo knowledge base và builder
 	lib := ast.NewKnowledgeLibrary()
+	rb := builder.NewRuleBuilder(lib)
 
-	// Tạo RuleBuilder với KnowledgeLibrary
-	ruleBuilder := builder.NewRuleBuilder(lib)
-
-	// Xây dựng rule từ dsl
-	err = ruleBuilder.BuildRuleFromResource("MyKnowledgeBase", "0.0.1", pkg.NewBytesResource([]byte(dsl)))
+	// Xây dựng rule
+	err := rb.BuildRuleFromResource("RedemptionRules", "0.0.1", pkg.NewBytesResource([]byte(rule)))
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("Error building rule: %v", err)
 	}
 
-	// Lấy KnowledgeBaseInstance và xử lý lỗi nếu có
-	kb, err := lib.NewKnowledgeBaseInstance("MyKnowledgeBase", "0.0.1")
+	kb, err := lib.NewKnowledgeBaseInstance("RedemptionRules", "0.0.1")
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("Error getting knowledge base: %v", err)
 	}
 
-	// Tạo và chạy engine
-	ruleEngine := engine.NewGruleEngine()
-	err = ruleEngine.Execute(dataContext, kb)
+	// Chuẩn bị engine và dữ liệu
+	eng := engine.NewGruleEngine()
+	dctx := ast.NewDataContext()
+	dctx.Add("Order", order)
+	dctx.Add("Customer", customer)
+	dctx.Add("Action", action)
+
+	// Thêm rewardProcessor vào DataContext
+	rewardProcessor := &RewardProcessor{}
+	dctx.Add("RewardProcessor", rewardProcessor)
+
+	// Thực thi rule
+	err = eng.Execute(dctx, kb)
 	if err != nil {
-		log.Fatalf("Error executing rule: %v", err)
+		return fmt.Errorf("Error executing rule: %v", err)
+	}
+	fmt.Println("Rule executed successfully.")
+	return nil
+}
+
+// Định nghĩa rule
+var RuleWithMoreConditions = `
+rule RuleWithMoreConditions "RuleWithMoreConditions" {
+    when
+        (
+		Order.Total >= 100.0 && 
+		Order.Amount >= 2.0 &&
+		Order.PlaceOrderDate >= 1721655565 && Order.PlaceOrderDate <= 1729655565 &&
+		Customer.Tier == "Tier1" &&
+		Action.Event == "ABC123" &&
+		(Order.CheckSkuContains("SKU1") && Order.CheckSkuContains("SKU2")) && 
+		(Order.CheckCategoryContains("Category1") && Order.CheckCategoryContains("Category2"))
+	) == true
+    then
+        RewardProcessor.ProcessRewards(Order, "redeemPoints", 10.0, "USD", "", 0.0, 0.0);
+        RewardProcessor.ProcessRewards(Order, "redeemPoints", 0.0, "USD", "", 2.0, 10.0);
+        RewardProcessor.ProcessRewards(Order, "redeemPoints", 0.01, "USD", "A", 0.0, 0.0);
+        RewardProcessor.ProcessRewards(Order, "redeemPoints", 0.0, "USD", "A", 2.0, 10.0);
+        RewardProcessor.ProcessRewards(Order, "redeemVoucher", 0.0, "USD", "", 0.0, 0.05); 
+        RewardProcessor.ProcessRewards(Order, "redeemVoucher", 100.0, "USD", "", 0.0, 0.0);
+        RewardProcessor.ProcessRewards(Order, "redeemVoucher", 0.0, "USD", "A", 0.0, 0.05);
+        RewardProcessor.ProcessRewards(Order, "redeemVoucher", 100.0, "USD", "A", 0.0, 0.0);
+        Retract("RuleWithMoreConditions");
+}
+`
+
+func main() {
+	// Tạo dữ liệu mẫu
+	order := &Order{
+		Total:          150,
+		Amount:         6,
+		PlaceOrderDate: 1722655565,
+		Tier:           "Tier1",
+		Channels:       []Channel{Offline},
+		Source:         "London1",
+		Currency:       "USD",
+		CLV:            2500,
+		Products: []*Product{
+			&Product{
+				SKU:      "SKU1",
+				Category: "Category1",
+				Price:    10,
+				Quantity: 5,
+				Currency: "USD",
+			},
+			&Product{
+				SKU:      "SKU2",
+				Category: "Category2",
+				Price:    100,
+				Quantity: 1,
+				Currency: "USD",
+			},
+		},
 	}
 
-	fmt.Println("Rule executed successfully!")
+	customer := &Customer{Tier: "Tier1"}
+	action := &Action{Event: "ABC123"}
+
+	// Thực thi rule
+	err := executeRule(order, customer, action, RuleWithMoreConditions)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	// Hiển thị toàn bộ kết quả lưu trữ trong rewardResults
+	fmt.Println("Reward Results:")
+	for _, result := range rewardResults {
+		fmt.Printf("%v\n", result)
+	}
 }

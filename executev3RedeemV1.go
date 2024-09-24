@@ -1,13 +1,20 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
+	"log"
+	"regexp"
+	"strconv"
+	"strings"
 
 	"github.com/hyperjumptech/grule-rule-engine/ast"
 	"github.com/hyperjumptech/grule-rule-engine/builder"
 	"github.com/hyperjumptech/grule-rule-engine/engine"
 	"github.com/hyperjumptech/grule-rule-engine/pkg"
 )
+
+var rewardResults []map[string]interface{}
 
 type Channel string
 
@@ -25,19 +32,94 @@ type Product struct {
 }
 
 type Order struct {
-	Total          float64
-	Amount         int
-	PlaceOrderDate int64
-	Tier           string
-	Channels       []Channel
-	Source         string
-	Currency       string
-	CLV            float64
-	Products       []*Product
+	Total               float64
+	Amount              int
+	PlaceOrderDate      int64
+	Tier                string
+	Channels            []Channel
+	Source              string
+	Currency            string
+	CLV                 float64
+	Products            []*Product
+	SkuCheckResult      bool
+	CategoryCheckResult bool
 }
 
-// Hàm kiểm tra SKU
-func (o *Order) CheckSkuContains(skus []string) bool {
+type Customer struct {
+	Tier string
+}
+
+type Action struct {
+	Event string
+}
+
+type RewardProcessor struct{}
+
+// Cập nhật hàm ProcessRewards để xử lý logic hiển thị
+func (rp *RewardProcessor) ProcessRewards(order *Order, rewardType string, collectionId string, conversionRate float64, currency string, productId string, basedPoint float64, convertedDiscount float64, fixedPoint float64, basedAmount float64) {
+	result := map[string]interface{}{
+		"rewardType": rewardType,
+	}
+
+	// Chỉ thêm collectionId nếu có giá trị
+	if collectionId != "" {
+		result["collectionId"] = collectionId
+	}
+
+	// Nếu fixedPoint > 0 thì không thêm currency, ngược lại thêm currency
+	if fixedPoint == 0 && currency != "" {
+		result["currency"] = currency
+	}
+
+	// Xử lý các giá trị khác nhau dựa trên loại rewardType
+	if rewardType == "earningPoints" {
+		if conversionRate != 0 {
+			result["conversionRate"] = conversionRate
+		}
+		// Thêm productId nếu khác "none"
+		if productId != "none" {
+			result["productId"] = productId
+		}
+		if basedPoint != 0 {
+			result["basedPoint"] = basedPoint
+		}
+
+		if basedAmount != 0 {
+			result["basedAmount"] = basedAmount
+		}
+
+		if convertedDiscount != 0 {
+			result["convertedDiscount"] = convertedDiscount
+		}
+		// Chỉ thêm fixedPoint nếu nó có giá trị
+		if fixedPoint != 0 {
+			result["fixedPoint"] = fixedPoint
+		}
+	} else {
+		if conversionRate != 0 {
+			result["fixedDiscount"] = conversionRate
+		}
+		// Thêm productId nếu khác "none"
+		if productId != "none" {
+			result["productId"] = productId
+		}
+		if basedPoint != 0 {
+			result["basedPoint"] = basedPoint
+		}
+		if convertedDiscount != 0 {
+			result["percentDiscount"] = convertedDiscount
+		}
+		// Chỉ thêm fixedPoint nếu nó có giá trị
+		if fixedPoint != 0 {
+			result["fixedPoint"] = fixedPoint
+		}
+	}
+
+	// Thêm kết quả vào danh sách rewardResults
+	rewardResults = append(rewardResults, result)
+}
+
+func (o *Order) CheckSkuContains(skus ...string) bool {
 	for _, sku := range skus {
 		for _, product := range o.Products {
 			if product.SKU == sku {
@@ -48,8 +130,7 @@ func (o *Order) CheckSkuContains(skus []string) bool {
 	return false
 }
 
-// Hàm kiểm tra Category
-func (o *Order) CheckCategoryContains(categories []string) bool {
+func (o *Order) CheckCategoryContains(categories ...string) bool {
 	for _, category := range categories {
 		for _, product := range o.Products {
 			if product.Category == category {
@@ -60,18 +141,113 @@ func (o *Order) CheckCategoryContains(categories []string) bool {
 	return false
 }
 
-// Hàm xử lý phần thưởng
-func processRewards(order *Order, rewardType string, conversionRate float64, currency string, basedPoint int, convertedDiscount int, productId string) {
-	fmt.Printf("Processing %s: conversionRate=%f, currency=%s, basedPoint=%d, convertedDiscount=%d, productId=%s\n", rewardType, conversionRate, currency, basedPoint, convertedDiscount, productId)
+func (o *Order) CheckChannelContains(channel string) bool {
+	for _, ch := range o.Channels {
+		if string(ch) == channel {
+			return true
+		}
+	}
+	return false
 }
 
-// Hàm thực thi rule
-func executeRule(order *Order, customer *Customer, action *Action, skus []string, categories []string, rule string) error {
-	// Tạo knowledge base và builder
+func (o *Order) CheckSourceContains(source string) bool {
+	return o.Source == source
+}
+
+func ensureFloat64(value string) string {
+	if value == "" {
+		return "0.0"
+	}
+	if strings.Contains(value, ".") {
+		parts := strings.Split(value, ".")
+		if len(parts[1]) == 0 {
+			return value + "0"
+		}
+		return value
+	}
+	if _, err := strconv.Atoi(value); err == nil {
+		return value + ".0"
+	}
+	return value
+}
+
+func transformProcessRewards(rule string) string {
+	const regex = `processRewards\(Order, "(.*?)", \{(.*?)\}\)(;?)`
+	re := regexp.MustCompile(regex)
+
+	transformedRule := re.ReplaceAllStringFunc(rule, func(match string) string {
+		subMatches := re.FindStringSubmatch(match)
+		rewardType := subMatches[1]
+		params := subMatches[2]
+
+		paramMap := make(map[string]string)
+		for _, param := range strings.Split(params, ",") {
+			parts := strings.Split(param, ":")
+			if len(parts) == 2 {
+				paramMap[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+			}
+		}
+
+		// Sử dụng chuỗi trống nếu thiếu collectionId
+		collectionId := paramMap["collectionId"]
+		if collectionId == "" {
+			collectionId = `""`
+		}
+
+		conversionRate := ensureFloat64(paramMap["conversionRate"])
+
+		// Xử lý currency, mặc định là "USD"
+		currency := paramMap["currency"]
+		if currency == "" {
+			currency = `"USD"`
+		}
+
+		productId := paramMap["productId"]
+		if productId == "" {
+			productId = `"none"`
+		}
+
+		basedPoint := ensureFloat64(paramMap["basedPoint"])
+		convertedDiscount := ensureFloat64(paramMap["convertedDiscount"])
+		fixedPoint := ensureFloat64(paramMap["fixedPoint"])
+		basedAmount := ensureFloat64(paramMap["basedAmount"])
+
+		var result string
+		if rewardType == "redeemVoucher" || rewardType == "earningVouchers" {
+			result = fmt.Sprintf(`RewardProcessor.ProcessRewards(Order, "%s", %s, %s, %s, %s, %s, %s, %s, %s);`,
+				rewardType, collectionId, conversionRate, currency, productId, basedPoint, convertedDiscount, fixedPoint, basedAmount)
+		} else {
+			result = fmt.Sprintf(`RewardProcessor.ProcessRewards(Order, "%s", %s, %s, %s, %s, %s, %s, %s, %s);`,
+				rewardType, collectionId, conversionRate, currency, productId, basedPoint, convertedDiscount, fixedPoint, basedAmount)
+		}
+
+		return result
+	})
+
+	return transformedRule
+}
+
+func ruleEngineDecode(encodedRule string) (string, error) {
+	decodedBytes, err := base64.StdEncoding.DecodeString(encodedRule)
+	if err != nil {
+		return "", err
+	}
+	return string(decodedBytes), nil
+}
+
+func executeRule(order *Order, customer *Customer, action *Action, ruleDataEncode string) error {
+	ruleData, errDecode := ruleEngineDecode(ruleDataEncode)
+	if errDecode != nil {
+		log.Fatalf("Error %v", errDecode)
+	}
+	fmt.Println(ruleData)
+
+	rule := transformProcessRewards(ruleData)
+	fmt.Println(rule)
+
 	lib := ast.NewKnowledgeLibrary()
 	rb := builder.NewRuleBuilder(lib)
 
-	// Xây dựng rule từ resource
 	err := rb.BuildRuleFromResource("RedemptionRules", "0.0.1", pkg.NewBytesResource([]byte(rule)))
 	if err != nil {
 		return fmt.Errorf("Error building rule: %v", err)
@@ -82,17 +258,15 @@ func executeRule(order *Order, customer *Customer, action *Action, skus []string
 		return fmt.Errorf("Error getting knowledge base: %v", err)
 	}
 
-	// Tạo engine và DataContext
 	eng := engine.NewGruleEngine()
 	dctx := ast.NewDataContext()
 	dctx.Add("Order", order)
 	dctx.Add("Customer", customer)
 	dctx.Add("Action", action)
-	dctx.Add("Skus", skus)
-	dctx.Add("Categories", categories)
-	dctx.Add("processRewards", processRewards)
 
-	// Thực thi rule
+	rewardProcessor := &RewardProcessor{}
+	dctx.Add("RewardProcessor", rewardProcessor)
+
 	err = eng.Execute(dctx, kb)
 	if err != nil {
 		return fmt.Errorf("Error executing rule: %v", err)
@@ -101,69 +275,15 @@ func executeRule(order *Order, customer *Customer, action *Action, skus []string
 	return nil
 }
 
-// Định nghĩa rule
 var RuleWithMoreConditions = `
-rule RuleWithMoreConditions "RuleWithMoreConditions" {
-    when
-        Order.Total >= 100 &&
-        Order.Amount >= 2 &&
-        Order.PlaceOrderDate >= 1726655565 && Order.PlaceOrderDate <= 1726755565 &&
-        Order.CheckSkuContains(Skus) == true &&  // Thay thế danh sách SKU bằng biến Skus
-        Order.CheckCategoryContains(Categories) == true &&  // Thay thế danh sách Category bằng biến Categories
-        Customer.Tier == "Tier1" &&
-        Action.Event == "ABC123"
-    then
-        processRewards(Order, "redeemPoints", 10.0, "USD", 0, 0, "");
-        processRewards(Order, "redeemPoints", 0.0, "USD", 2, 10, "");
-        processRewards(Order, "redeemPoints", 0.01, "USD", 0, 0, "A");
-        processRewards(Order, "redeemPoints", 0.0, "USD", 2, 10, "A");
-        processRewards(Order, "redeemVoucher", 0.0, "USD", 0, 0, "");
-        processRewards(Order, "redeemVoucher", 0.0, "USD", 0, 100, "");
-        processRewards(Order, "redeemVoucher", 0.0, "USD", 0, 0, "A");
-        processRewards(Order, "redeemVoucher", 0.0, "USD", 0, 100, "A");
-        Retract("RuleWithMoreConditions");
-}
+cnVsZSBSdWxlXzIxICJSdWxlXzIxIiB7CiAgICB3aGVuCiAgICAgICAgKE9yZGVyLlRvdGFsIDwgMjIyMiAmJgogICAgICAgICAgICBPcmRlci5BbW91bnQgPj0gMzMgJiYKICAgICAgICAgICAgT3JkZXIuQ2hlY2tDYXRlZ29yeUNvbnRhaW5zKCJNYWNib29rIikgJiYgT3JkZXIuQ2hlY2tDYXRlZ29yeUNvbnRhaW5zKCJMb2dpdGVjaCIpICYmIE9yZGVyLkNoZWNrQ2F0ZWdvcnlDb250YWlucygiSXBob25lIikpID09IHRydWUKICAgIHRoZW4KICAgICAgICBwcm9jZXNzUmV3YXJkcyhPcmRlciwgInJlZGVlbVBvaW50cyIsIHsgY29udmVyc2lvblJhdGU6IDIsIGN1cnJlbmN5OiAiMSIgfSk7CiAgICAgICAgICAgIHByb2Nlc3NSZXdhcmRzKE9yZGVyLCAicmVkZWVtUG9pbnRzIiwgeyBiYXNlZFBvaW50OiAzLCBjb252ZXJ0ZWREaXNjb3VudDogNCwgY3VycmVuY3k6ICIxIiB9KTsKICAgICAgICAgICAgcHJvY2Vzc1Jld2FyZHMoT3JkZXIsICJyZWRlZW1Qb2ludHMiLCB7IGNvbnZlcnNpb25SYXRlOiA1LCBwcm9kdWN0SWQ6ICIxIiwgY3VycmVuY3k6ICIxIiB9KTsKICAgICAgICAgICAgcHJvY2Vzc1Jld2FyZHMoT3JkZXIsICJyZWRlZW1Qb2ludHMiLCB7IGJhc2VkUG9pbnQ6IDYsIGNvbnZlcnRlZERpc2NvdW50OiA3LCBwcm9kdWN0SWQ6ICIyIiwgY3VycmVuY3k6ICIxIiB9KTsKICAgICAgICBwcm9jZXNzUmV3YXJkcyhPcmRlciwgInJlZGVlbVZvdWNoZXIiLCB7IGNvbGxlY3Rpb25JZDogIjEiLCBwZXJjZW50RGlzY291bnQ6IDAuMDgsIGN1cnJlbmN5OiAiMSIgfSk7CiAgICAgICAgICAgIHByb2Nlc3NSZXdhcmRzKE9yZGVyLCAicmVkZWVtVm91Y2hlciIsIHsgY29sbGVjdGlvbklkOiAiMjIyMjIiLCBmaXhlZERpc2NvdW50OiA5LCBwcm9kdWN0SWQ6ICIyIiwgY3VycmVuY3k6ICIxIiB9KTsKICAgICAgICBSZXRyYWN0KCJSdWxlXzIxIik7Cn0K
 `
 
-type Customer struct {
-	Tier string
-}
-
-type Action struct {
-	Event string
-}
-
-func printOrderDetails(order *Order) {
-	fmt.Println("===============")
-	fmt.Println("Order Details:")
-	fmt.Printf("Total: %.2f\n", order.Total)
-	fmt.Printf("Amount: %d\n", order.Amount)
-	fmt.Printf("Place Order Date: %d\n", order.PlaceOrderDate)
-	fmt.Printf("Tier: %s\n", order.Tier)
-	fmt.Printf("Channels: %v\n", order.Channels)
-	fmt.Printf("Source: %s\n", order.Source)
-	fmt.Printf("Currency: %s\n", order.Currency)
-	fmt.Printf("CLV: %.2f\n", order.CLV)
-	fmt.Println("Products:")
-	for i, product := range order.Products {
-		fmt.Println("===============")
-		fmt.Printf("  Product %d:\n", i+1)
-		fmt.Printf("    SKU: %s\n", product.SKU)
-		fmt.Printf("    Category: %s\n", product.Category)
-		fmt.Printf("    Price: %.2f\n", product.Price)
-		fmt.Printf("    Quantity: %d\n", product.Quantity)
-		fmt.Printf("    Currency: %s\n", product.Currency)
-		fmt.Println("===============")
-	}
-
-}
-
 func main() {
-	// Tạo dữ liệu mẫu
 	order := &Order{
 		Total:          150,
-		Amount:         6,
-		PlaceOrderDate: 1724235564,
+		Amount:         40,
+		PlaceOrderDate: 1722655565,
 		Tier:           "Tier1",
 		Channels:       []Channel{Offline},
 		Source:         "London1",
@@ -172,14 +292,21 @@ func main() {
 		Products: []*Product{
 			&Product{
 				SKU:      "SKU1",
-				Category: "Iphone",
+				Category: "Macbook",
 				Price:    10,
 				Quantity: 5,
 				Currency: "USD",
 			},
 			&Product{
 				SKU:      "SKU2",
-				Category: "Macbook",
+				Category: "Logitech",
+				Price:    100,
+				Quantity: 1,
+				Currency: "USD",
+			},
+			&Product{
+				SKU:      "SKU2",
+				Category: "Iphone",
 				Price:    100,
 				Quantity: 1,
 				Currency: "USD",
@@ -190,14 +317,13 @@ func main() {
 	customer := &Customer{Tier: "Tier1"}
 	action := &Action{Event: "ABC123"}
 
-	// Tạo danh sách SKU và Category
-	skus := []string{"SKU1", "SKU2"}
-	categories := []string{"Category1", "Category2"}
-
-	// Thực thi rule
-	err := executeRule(order, customer, action, skus, categories, RuleWithMoreConditions)
+	err := executeRule(order, customer, action, RuleWithMoreConditions)
 	if err != nil {
 		fmt.Println(err)
 	}
-	printOrderDetails(order)
+
+	fmt.Println("Reward Results:")
+	for _, result := range rewardResults {
+		fmt.Printf("%v\n", result)
+	}
 }
