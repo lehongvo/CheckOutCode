@@ -109,27 +109,27 @@ function generateRuleEngine(ruleName: string, input: RedemptionRuleInput) {
                     return `${structNameValue}.${condition.field} >= ${condition.value[0]} && ${structNameValue}.${condition.field} <= ${condition.value[1]}`;
                 }
                 if (condition.field === 'SKU') {
-                    return values.map(v => `${structNameValue}.CheckSkuContains(${v})`).join(' && ');
+                    return values.map(v => `${structNameValue}.CheckSkuContains(${v})`).join(' || ');
                 } else if (condition.field === 'Category') {
-                    return values.map(v => `${structNameValue}.CheckCategoryContains(${v})`).join(' && ');
+                    return values.map(v => `${structNameValue}.CheckCategoryContains(${v})`).join(' || ');
                 } else {
                     if (condition.field === 'Event') {
-                        return values.map(v => `${structNameValue}.CheckEventContains(${v})`).join(' && ');
+                        return values.map(v => `${structNameValue}.CheckEventContains(${v})`).join(' || ');
                     } else {
                         if (condition.field === 'Source') {
-                            return values.map(v => `${structNameValue}.CheckSourceContains(${v})`).join(' && ');
+                            return values.map(v => `${structNameValue}.CheckSourceContains(${v})`).join(' || ');
                         } else {
                             if (condition.field == 'Channel') {
-                                return values.map(v => `${structNameValue}.CheckChannelContains(${v})`).join(' && ');
+                                return values.map(v => `${structNameValue}.CheckChannelContains(${v})`).join(' || ');
                             } else {
                                 if (condition.field == 'Referral') {
-                                    return values.map(v => `${structNameValue}.CheckReferralContains(${v})`).join(' && ');
+                                    return values.map(v => `${structNameValue}.CheckReferralContains(${v})`).join(' || ');
                                 } else {
                                     if (condition.field == 'Game') {
-                                        return values.map(v => `${structNameValue}.CheckGameContains(${v})`).join(' && ');
+                                        return values.map(v => `${structNameValue}.CheckGameContains(${v})`).join(' || ');
                                     } else {
                                         if (condition.field == 'Mission') {
-                                            return values.map(v => `${structNameValue}.CheckMissionContains(${v})`).join(' && ');
+                                            return values.map(v => `${structNameValue}.CheckMissionContains(${v})`).join(' || ');
                                         }
                                     }
                                 }
@@ -216,14 +216,14 @@ function generateRuleEngine(ruleName: string, input: RedemptionRuleInput) {
 
 const ruleInput: RedemptionRuleInput = {
     conditions: [
-        { field: "SKU", operator: "in", value: "SKU10" },
-        { field: 'Total', operator: '>=', value: 100 },
-        { field: '≈', operator: '==', value: [1726765200] },
-        { field: 'PlaceOrderDate', operator: 'not in', value: [1726655565, 1726755565] },
-        { field: 'SKU', operator: 'in', value: ["SKU1"] },
-        { field: 'Category', operator: 'not in', value: ["Category1", "Category2"] },
-        { field: 'Tier', operator: '==', value: "Tier1" },
-        { field: 'Event', operator: '==', value: "ABC123" },
+        { field: "SKU", operator: "in", value: ["SKU1", "SKU2", "SKU3"] },
+        // { field: 'Total', operator: '>=', value: 100 },
+        // { field: '≈', operator: '==', value: [1726765200] },
+        // { field: 'PlaceOrderDate', operator: 'not in', value: [1726655565, 1726755565] },
+        // { field: 'SKU', operator: 'in', value: ["SKU1"] },
+        // { field: 'Category', operator: 'not in', value: ["Category1", "Category2"] },
+        // { field: 'Tier', operator: '==', value: "Tier1" },
+        // { field: 'Event', operator: '==', value: "ABC123" },
         // {
         //     "field": "Birthday",
         //     "operator": "in",
@@ -249,11 +249,11 @@ const ruleInput: RedemptionRuleInput = {
         //         "EVENT3"
         //     ]
         // }
-        {
-            field: 'Mission',
-            operator: 'in',
-            value: 'MISS1 Miss2',
-        },
+        // {
+        //     field: 'Mission',
+        //     operator: 'in',
+        //     value: 'MISS1 Miss2',
+        // },
 
     ],
     points: [
